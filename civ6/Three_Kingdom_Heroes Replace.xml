@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GameData>
+	<!-- 关羽 -->
+	<Projects>
+		<Update>
+			<Where ProjectType="PROJECT_CREATE_HERO_PHANTA_GUAN_YU" />
+			<Set UnlocksFromEffect="false" />
+		</Update>
+	</Projects>
+	<Units>
+		<Update>
+			<Where UnitType="UNIT_HERO_PHANTA_GUAN_YU" />
+			<Set CanEarnExperience="true" PromotionClass="PROMOTION_CLASS_TK_GUAN_YU" />
+		</Update>
+	</Units>
+	<Units_XP2>
+		<Update>
+			<Where UnitType="UNIT_HERO_PHANTA_GUAN_YU" />
+			<Set CanEarnExperience="true" />
+		</Update>
+	</Units_XP2>
+	<!-- 吕布 -->
+	<UnitRetreats_XP1>
+		<Delete UnitType="UNIT_HULAO_LUBU" />
+	</UnitRetreats_XP1>
+	<Types>
+		<Delete Type="UNIT_HULAO_LUBU" />
+	</Types>
+	<Units>
+		<Delete UnitType="UNIT_HULAO_LUBU" />
+	</Units>
+	<TypeTags>
+		<Delete Type="UNIT_HULAO_LUBU" />
+	</TypeTags>
+	<UnitAiInfos>
+		<Delete UnitType="UNIT_HULAO_LUBU" />
+	</UnitAiInfos>
+	<BuildingModifiers>
+		<Delete BuildingType="BUILDING_HULAO_GATE" ModifierId="MODIFIER_BUILDING_HULAO_GATE_A" />
+		<Delete BuildingType="BUILDING_HULAO_GATE" ModifierId="MODIFIER_BUILDING_HULAO_GATE_B" />
+	</BuildingModifiers>
+	<UnitAbilities>
+		<Update>
+			<Where UnitAbilityType="ABILITY_HULAO_LUBU" />
+			<Set Description="LOC_ABILITY_HULAO_LUBU_DESCRIPTION" />
+		</Update>
+	</UnitAbilities>
+	<UnitAbilityModifiers>
+		<Delete UnitAbilityType="ABILITY_HULAO_LUBU" ModifierId="MODIFIER_ABILITY_HULAO_LUBU_A" />
+		<Delete UnitAbilityType="ABILITY_HULAO_LUBU_DEBUFF" ModifierId="MODIFIER_ABILITY_HULAO_LUBU_DEBUFF_A" />
+	</UnitAbilityModifiers>
+	<RequirementArguments>
+		<Update>
+			<Where RequirementId="REQ_HULAO_LUBU_1" Name="MaxDistance" />
+			<Set Value="2" />
+		</Update>
+	</RequirementArguments>
+</GameData>

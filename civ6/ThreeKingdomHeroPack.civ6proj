@@ -1,0 +1,283 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Default" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Default</Configuration>
+    <Name>Three Kingdom Hero Pack</Name>
+    <Guid>2478ad10-ac54-475c-bd8b-e856a072f644</Guid>
+    <ProjectGuid>9896526c-3d3f-4ca1-b2d1-ef08c343f45b</ProjectGuid>
+    <ModVersion>1</ModVersion>
+    <Teaser>This is a brief description of the mod.</Teaser>
+    <Description>This is a brief description of the mod.</Description>
+    <Authors>ps</Authors>
+    <SpecialThanks>
+    </SpecialThanks>
+    <AffectsSavedGames>true</AffectsSavedGames>
+    <SupportsSinglePlayer>true</SupportsSinglePlayer>
+    <SupportsMultiplayer>true</SupportsMultiplayer>
+    <SupportsHotSeat>true</SupportsHotSeat>
+    <CompatibleVersions>1.2,2.0</CompatibleVersions>
+    <AssemblyName>ThreeKingdomHeroPack</AssemblyName>
+    <RootNamespace>ThreeKingdomHeroPack</RootNamespace>
+    <InGameActionData><![CDATA[<InGameActions><UpdateDatabase id="UpdateDatabase"><Properties><LoadOrder>10001</LoadOrder></Properties><Criteria>Heroes_Mode</Criteria><Criteria>Expansion2</Criteria><File>Data/Replace/TKH_HeroesReplace.xml</File><File>Data/TKH_Promotions.sql</File><File>Data/TKH_PromotionsModifiers.sql</File><File>Data/TKH_UnitAbilities.xml</File><File>Data/TKH_GreatPeoples.xml</File><File>Data/TKH_Projects.xml</File><File>Data/TKH_Buildings.xml</File><File>Data/TKH_Improvements.xml</File><File>Data/TKH_Improvements.sql</File><File>Data/TKH_Notifications.xml</File><File>Data/Equipments/TKH_Equipments.sql</File><File>Data/Equipments/TKH_EquipmentsAbilities.sql</File><File>Data/Equipments/TKH_EquipmentsCivilopedia.xml</File><File>Data/Heroes/TKH_Heroes_Base.sql</File><File>Data/Heroes/TKH_Heroes_BaseUnit.xml</File><File>Data/TKH_UnitTags.sql</File><File>Data/TKH_UnitCommands.sql</File><File>Data/TKH_GreatCityMode.sql</File><File>Data/TKH_LuxuryTax.sql</File><File>Data/TKH_GreatPeoples.sql</File></UpdateDatabase><UpdateText id="UpdateText"><Properties><LoadOrder>100</LoadOrder></Properties><File>Text/TKH_Text.xml</File><File>Text/TKH_Text.sql</File></UpdateText><UpdateIcons id="UpdateIcons"><Properties><LoadOrder>10000</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Icons/TKH_Unit_Icons.xml</File><File>Icons/TKH_Equipment_Icons.xml</File><File>Icons/TKH_Icons.xml</File><File>Icons/TKH_Icons.sql</File></UpdateIcons><UpdateArt id="UpdateArt"><Properties><LoadOrder>199800</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>(Mod Art Dependency File)</File></UpdateArt><AddUserInterfaces id="AdditionalUI"><Properties><Context>InGame</Context><LoadOrder>1000</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>UI/Additional/EquipmentPanel.xml</File><File>UI/Additional/EquipmentPanel_Button.xml</File><File>UI/Additional/Additional_Buttons.xml</File><File>UI/Additional/TKH_UI_Scripts.xml</File></AddUserInterfaces><ImportFiles id="AdditionalUIScripts"><Properties><LoadOrder>10000</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>UI/Additional/EquipmentPanel.lua</File><File>UI/Additional/EquipmentPanel_Button.lua</File><File>UI/Additional/Additional_Buttons.lua</File><File>UI/Additional/CivilopediaPage_Equipment.lua</File><File>UI/Additional/TKH_UI_Scripts.lua</File></ImportFiles><ReplaceUIScript id="TKH_UnitPanel"><Properties><LuaContext>UnitPanel</LuaContext><LuaReplace>UI/Replacements/UnitPanel_TKH.lua</LuaReplace><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria></ReplaceUIScript><ReplaceUIScript id="UnitFlagManager_TKH_BMode"><Properties><LoadOrder>200200</LoadOrder><LuaContext>UnitFlagManager</LuaContext><LuaReplace>UI/Replacements/UnitFlagManager_TKH_BMode.lua</LuaReplace></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>BarbarianClansMode</Criteria></ReplaceUIScript><ReplaceUIScript id="UnitFlagManager_TKH_NO_BMode"><Properties><LuaReplace>UI/Replacements/UnitFlagManager_TKH_NO_BMode.lua</LuaReplace><LuaContext>UnitFlagManager</LuaContext><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>BarbarianClansModeNotInUse</Criteria></ReplaceUIScript><ReplaceUIScript id="TKH_WorldInput"><Properties><LuaContext>WorldInput</LuaContext><LuaReplace>UI/Replacements/WorldInput_UnitInterface.lua</LuaReplace><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria></ReplaceUIScript><ReplaceUIScript id="TopPanel_LuxuryTax"><Properties><LuaContext>TopPanel</LuaContext><LoadOrder>200200</LoadOrder><LuaReplace>UI/Replacements/TopPanel_LuxuryTax.lua</LuaReplace></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>LuxuryTaxMode</Criteria></ReplaceUIScript><ImportFiles id="ReplacementUIScripts"><Properties><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>UI/Replacements/TopPanel_LuxuryTax.lua</File><File>UI/Replacements/UnitPanel_TKH.lua</File><File>UI/Replacements/WorldInput_UnitInterface.lua</File><File>UI/Replacements/GreatPeoplePopup_TKH.lua</File><File>UI/Replacements/CivilopediaPage_Project.lua</File><File>UI/Replacements/ProductionPanel_TKH.lua</File><File>UI/Replacements/UnitFlagManager_TKH_BMode.lua</File><File>UI/Replacements/UnitFlagManager_TKH_NO_BMode.lua</File><File>UI/Replacements/HeroesPopup.lua</File><File>UI/Replacements/HeroesSupport.lua</File><File>UI/Replacements/CivilopediaPage_GreatPerson.lua</File><File>UI/Replacements/CivilopediaPage_HeroUnit.lua</File><File>UI/Replacements/NotificationPanel_TKH.lua</File></ImportFiles><AddGameplayScripts id="GameplayScripts"><Properties><LoadOrder>10</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Scripts/Gameplay/TKH_LuxuryTax.lua</File><File>Scripts/Gameplay/TKH_GamePlayScripts.lua</File><File>Scripts/Gameplay/TKH_EquipmentEffectHandler.lua</File><File>Scripts/Gameplay/TKH_HeroManager.lua</File><File>Scripts/Gameplay/TKH_HeroEffectHandler.lua</File><File>Scripts/Gameplay/TKH_UnitCommands.lua</File></AddGameplayScripts><UpdateDatabase id="TKH_UnitCostPopulation"><Properties><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>UNIT_COST_POPULATION</Criteria><File>Data/TKH_UnitCostPopulation.sql</File></UpdateDatabase><UpdateDatabase id="UnitHighCostDatabase"><Properties><LoadOrder>200200</LoadOrder></Properties><Criteria>Heroes_Mode</Criteria><Criteria>Expansion2</Criteria><Criteria>UnitHighCostMode</Criteria><File>Data/TKH_UnitHighCostMode.sql</File></UpdateDatabase><UpdateDatabase id="MoarUniqueUnitsUpdate"><Properties><LoadOrder>200200</LoadOrder></Properties><Criteria>MoarUniqueUnitsInUse</Criteria><File>Data/Replace/KTH_MoarUniqueUnits.sql</File></UpdateDatabase><ReplaceUIScript id="ProductionPanel_TKH"><Properties><LuaContext>ProductionPanel</LuaContext><LuaReplace>UI/Replacements/ProductionPanel_TKH.lua</LuaReplace><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria></ReplaceUIScript><UpdateDatabase id="AIInfernoModeData"><Properties><LoadOrder>10001</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>AIInfernoModeInActive</Criteria><File>Data/TKH_AIInfernoMode.xml</File></UpdateDatabase><UpdateDatabase id="TKH_UnitUpgrade"><Properties><LoadOrder>10001</LoadOrder></Properties><Criteria>EquipmentUpgradeModeInActive</Criteria><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Data/TKH_UnitUpgrade.sql</File></UpdateDatabase><ImportFiles id="ImportFiles"><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Scripts/TKH_Constant.lua</File><File>Scripts/TKH_UnitCommandDefs.lua</File><File>Scripts/TKH_Helper.lua</File></ImportFiles><UpdateDatabase id="TKH_RegisteTables"><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Data/TKH_RegisteTables.sql</File></UpdateDatabase><UpdateDatabase id="TKH_RequirementSets"><Properties><LoadOrder>10000</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><File>Data/TKH_RequirementSets.sql</File></UpdateDatabase><UpdateDatabase id="TKH_WarAndChaos"><Properties><LoadOrder>200200</LoadOrder></Properties><Criteria>Expansion2</Criteria><Criteria>Heroes_Mode</Criteria><Criteria>WarAndChaosMode</Criteria><File>Data/TKH_WarAndChaos.sql</File></UpdateDatabase></InGameActions>]]></InGameActionData>
+    <ActionCriteriaData><![CDATA[<ActionCriteria><Criteria id="Expansion2"><GameCoreInUse>Expansion2</GameCoreInUse></Criteria><Criteria id="Vietnam_DLC"><RuleSetInUse>RULESET_EXPANSION_2</RuleSetInUse><ModInUse>A3F42CD4-6C3E-4F5A-BC81-BE29E0C0B87C</ModInUse></Criteria><Criteria id="Ethiopia_DLC"><RuleSetInUse>RULESET_EXPANSION_2</RuleSetInUse><ModInUse>1B394FE9-23DC-4868-8F0A-5220CB8FB427</ModInUse></Criteria><Criteria id="Monopolies_Mode"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_MONOPOLIES</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="SecretSocieties_Mode"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_SECRETSOCIETIES</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="APOCALYPSE_MODE"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_APOCALYPSE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="GranColombia_Maya"><ModInUse>9DE86512-DE1A-400D-8C0A-AB46EBBF76B9</ModInUse></Criteria><Criteria id="Heroes_Mode"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_HEROES</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="BetterTradeModInUse"><ModInUse>8d4fa23a-ef43-440c-8422-2bec11f8f5d7</ModInUse></Criteria><Criteria id="LuxuryTaxMode"><ConfigurationValueMatches><ConfigurationId>LUXURY_TAX_MODE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="WarAndChaosMode"><ConfigurationValueMatches><ConfigurationId>WAR_AND_CHAOS_MODE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="UnitHighCostMode"><ConfigurationValueMatches><ConfigurationId>UNIT_HIGH_COST_MODE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="MoarUniqueUnitsInUse"><ModInUse>59FE0613-2425-2B01-7247-5EB8007DC288</ModInUse></Criteria><Criteria id="UnitCostPopulation"><ConfigurationValueMatches><ConfigurationId>UNIT_COST_POPULATION</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="UNIT_COST_POPULATION"><ConfigurationValueMatches><ConfigurationId>UNIT_COST_POPULATION</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="BarbarianClansMode"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_BARBARIAN_CLANS</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="BarbarianClansModeNotInUse"><ConfigurationValueMatches><ConfigurationId>GAMEMODE_BARBARIAN_CLANS</ConfigurationId><Group>Game</Group><Value>0</Value></ConfigurationValueMatches></Criteria><Criteria id="AIInfernoModeInActive"><ConfigurationValueMatches><ConfigurationId>AI_INFERNO_MODE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria><Criteria id="EquipmentUpgradeModeInActive"><ConfigurationValueMatches><ConfigurationId>EQUIPMENT_UPGRADE_MODE</ConfigurationId><Group>Game</Group><Value>1</Value></ConfigurationValueMatches></Criteria></ActionCriteria>]]></ActionCriteriaData>
+    <AssociationData><![CDATA[<Associations>
+  <Dependency type="Dlc" title="Expansion: Gathering Storm" id="4873eb62-8ccc-4574-b784-dda455e74e68" />
+  <Dependency type="Dlc" title="Expansion: Rise and Fall" id="1B28771A-C749-434B-9053-D1380C553DE9" />
+  <Dependency type="Dlc" title="HeroModDlc" id="8424840C-92EF-4426-A9B4-B4E0CB818049" />
+  <Reference type="Dlc" title="HeroModDlc" id="8424840C-92EF-4426-A9B4-B4E0CB818049" />
+  <Dependency type="Dlc" title="Byzantium_Gaul" id="A1100FC4-70F2-4129-AC27-2A65A685ED08" />
+  <Reference type="Dlc" title="Byzantium_Gaul" id="A1100FC4-70F2-4129-AC27-2A65A685ED08" />
+  <Dependency type="Dlc" title="Indonesia_Khmer" id="1F367231-A040-4793-BDBB-088816853683" />
+  <Reference type="Dlc" title="IndonesiaKhmer" id="1F367231-A040-4793-BDBB-088816853683" />
+  <Dependency type="Mod" title="钢铁雷霆 特色单位 优化汉化版" id="59FE0613-2425-2B01-7247-5EB8007DC288" />
+  <Dependency type="Mod" title="中世纪扩展" id="26ec3597-bb80-424a-9958-cdf3bee00265" />
+  <Dependency type="Mod" title="Phantagonist：中国王朝特性" id="4c4a883e-21a5-46af-99b3-ae018d7e0a3e" />
+  <Dependency type="Mod" title="Phantagonist：关羽（英雄）" id="d98ac593-2889-4c1f-af50-94fef3ae1c04" />
+  <Dependency type="Mod" title="Phantagonist：三国领袖包（一）" id="eb6b235b-d07a-48cb-9bd5-82f666d17020" />
+  <Dependency type="Mod" title="Phantagonist：三国领袖包（二）" id="8480db96-08bc-4192-a36b-2cad6ef265a9" />
+  <Dependency type="Mod" title="Hulao gate" id="fa16117f-6ac2-4a7e-a2cb-c3c2f99ad922" />
+</Associations>]]></AssociationData>
+    <FrontEndActionData><![CDATA[<FrontEndActions><UpdateDatabase id="GameConfigs"><Properties><LoadOrder>10</LoadOrder></Properties><File>Configs/TKH_GameConfigs.xml</File></UpdateDatabase><UpdateText id="GameConfigText"><File>Configs/TKH_GameConfigText.xml</File></UpdateText><UpdateDatabase id="MoarUniqueUnitsUpdate"><Properties><LoadOrder>200200</LoadOrder></Properties><File>Data/Replace/KTH_MoarUniqueUnits_Front.sql</File></UpdateDatabase><UpdateColors id="UpdateColors"><File>Colors/TKH_Colors.xml</File></UpdateColors><UpdateText id="UpdateText"><Properties><LoadOrder>100008</LoadOrder></Properties><File>Text/TKH_Text.sql</File><File>Text/TKH_Text.xml</File></UpdateText></FrontEndActions>]]></FrontEndActionData>
+    <ModProperties>
+      <CustomProperties xmlns="" />
+    </ModProperties>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Default' ">
+    <OutputPath>.</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="ThreeKingdomHeroPack.Art.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="ArtDefs\Improvements.artdef">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="ArtDefs\Units.artdef">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Colors\TKH_Colors.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Configs\TKH_GameConfigs.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Configs\TKH_GameConfigText.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Equipments\TKH_EquipmentsAbilities.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Equipments\TKH_EquipmentsCivilopedia.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Equipments\TKH_Equipments.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_GreatCityMode.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_GreatPeoples.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_LuxuryTax.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Notifications.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_PromotionsModifiers.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Heroes\TKH_Heroes_Base.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Heroes\TKH_Heroes_BaseUnit.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Replace\KTH_MoarUniqueUnits.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Replace\KTH_MoarUniqueUnits_Front.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\Replace\TKH_HeroesReplace.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_AIInfernoMode.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Buildings.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_GreatPeoples.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Improvements.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Improvements.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Promotions.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_RegisteTables.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_RequirementSets.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitAbilities.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_Projects.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitCommands.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitCostPopulation.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitHighCostMode.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitTags.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_UnitUpgrade.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Data\TKH_WarAndChaos.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Icons\TKH_Icons.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Icons\TKH_Icons.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Icons\TKH_Equipment_Icons.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Icons\TKH_Unit_Icons.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_EquipmentEffectHandler.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_EquipmentManager.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_HeroEffectHandler.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_HeroManager.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_LuxuryTax.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_GamePlayScripts.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\Gameplay\TKH_UnitCommands.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\TKH_Constant.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\TKH_Helper.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Scripts\TKH_UnitCommandDefs.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Text\TKH_Text.sql">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Text\TKH_Text.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\Additional_Buttons.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\Additional_Buttons.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\CivilopediaPage_Equipment.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\EquipmentPanel.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\EquipmentPanel.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\EquipmentPanel_Button.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\EquipmentPanel_Button.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\TKH_UI_Scripts.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Additional\TKH_UI_Scripts.xml">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\CivilopediaPage_GreatPerson.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\CivilopediaPage_HeroUnit.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\GreatPeoplePopup_TKH.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\HeroesPopup.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\HeroesSupport.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\NotificationPanel_TKH.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\ProductionPanel_TKH.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\TopPanel_LuxuryTax.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\UnitFlagManager_TKH_BMode.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\UnitFlagManager_TKH_NO_BMode.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\UnitPanel_TKH.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="UI\Replacements\WorldInput_UnitInterface.lua">
+      <SubType>Content</SubType>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ArtDefs\" />
+    <Folder Include="Data\" />
+    <Folder Include="Data\Heroes" />
+    <Folder Include="Data\Equipments" />
+    <Folder Include="Data\Replace" />
+    <Folder Include="Icons" />
+    <Folder Include="Configs" />
+    <Folder Include="Colors" />
+    <Folder Include="UI" />
+    <Folder Include="Scripts" />
+    <Folder Include="Scripts\Gameplay" />
+    <Folder Include="Text\" />
+    <Folder Include="UI\Additional" />
+    <Folder Include="UI\Replacements\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildLocalExtensionPath)Civ6.targets" />
+</Project>
