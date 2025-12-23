@@ -29,23 +29,27 @@ def apply_circle_mask(original_image):
 
     return result
 
-
-if __name__ == '__main__':
-    # root = r'C:\Users\10704\PycharmProjects\PythonProject\civ6\save_images'  # 保存地址
-    path = './original_images/'
-    save_path = './save_images/'
-
-    Image_glob = os.path.join(path, "*.png")
+def get_dir_images(dir_path):
+    Image_glob = os.path.join(dir_path, "*.png")
     Image_name_list = []
 
     Image_name_list.extend(glob.glob(Image_glob))
-    max_ = 93
-    images = []
-    for i in range(1,94):
-        image = apply_circle_mask(read_dds_image(path+'{id}.png'.format(id=i)))
-        images.append(image)
+    _images = []
+    for i in range(len(Image_name_list)):
+        print(i, i+1)
+        _image = apply_circle_mask(read_dds_image(dir_path+'{id}.png'.format(id=(i+1))))
+        _images.append(_image)
 
-    concatenated_image_horizontal = Image.new("RGBA", (2200, 2420), (0,0,0,0))
+    return _images
+
+if __name__ == '__main__':
+    # root = r'C:\Users\10704\PycharmProjects\PythonProject\civ6\save_images'  # 保存地址
+    path = './original_images/EX1/'
+    save_path = './save_images/'
+
+    images = get_dir_images('./original_images/EX1/')
+    images.extend(get_dir_images('./original_images/EX2/'))
+    concatenated_image_horizontal = Image.new("RGBA", (2200, 220*(len(images)//10+1)), (0,0,0,0))
 
     index = 0
     row_index = 0
@@ -57,14 +61,5 @@ if __name__ == '__main__':
         height = (row_index-1)*220
 
         concatenated_image_horizontal.paste(image, (weight, height))
-        # concatenated_image_horizontal.paste(image2, (image1.width, 0))
         index += 1
     concatenated_image_horizontal.save('test.png')
-
-
-
-    # read_dds_image('ICON_EQUIPMENT_JingTieJia_220.dds')
-
-    # result_image = apply_circle_mask('ICON_EQUIPMENT_JingTieJia_220.png')
-    # result_image.save(path+'test.png', quality=95)
-    # result_image.show()
