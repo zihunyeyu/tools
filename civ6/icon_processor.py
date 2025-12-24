@@ -43,8 +43,6 @@ def get_dir_images(dir_path):
 
 if __name__ == '__main__':
     # root = r'C:\Users\10704\PycharmProjects\PythonProject\civ6\save_images'  # 保存地址
-    path = './original_images/EX1/'
-    save_path = './save_images/'
 
     images = get_dir_images('./original_images/EX2/')
     # images.extend(get_dir_images('./original_images/EX2/'))
