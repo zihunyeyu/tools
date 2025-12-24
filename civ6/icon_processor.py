@@ -36,7 +36,6 @@ def get_dir_images(dir_path):
     Image_name_list.extend(glob.glob(Image_glob))
     _images = []
     for i in range(len(Image_name_list)):
-        print(i, i+1)
         _image = apply_circle_mask(read_dds_image(dir_path+'{id}.png'.format(id=(i+1))))
         _images.append(_image)
 
@@ -47,8 +46,8 @@ if __name__ == '__main__':
     path = './original_images/EX1/'
     save_path = './save_images/'
 
-    images = get_dir_images('./original_images/EX1/')
-    images.extend(get_dir_images('./original_images/EX2/'))
+    images = get_dir_images('./original_images/EX2/')
+    # images.extend(get_dir_images('./original_images/EX2/'))
     concatenated_image_horizontal = Image.new("RGBA", (2200, 220*(len(images)//10+1)), (0,0,0,0))
 
     index = 0
