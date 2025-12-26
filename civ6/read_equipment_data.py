@@ -1,7 +1,5 @@
-import numpy
 import pandas as pd
-import numpy as np
-from pypinyin import pinyin, lazy_pinyin, Style
+from pypinyin import lazy_pinyin
 
 # -- ('EQUIPMENT_FangTianHuaJi', 'EQUIPMENT_WEAPON', 'LV_BU', 0, 20, NULL, NULL, 1, 9000, 0, 0, 0),
 equipment_sql = "('{e_name}', '{e_type}', '{e_hero}', 0, 20, NULL, NULL, 1, 9000, {e_armor}, 0, 0),"
@@ -21,11 +19,6 @@ e_text = r'''<Replace Tag="LOC_{equipment}_NAME" Language="zh_Hans_CN">
 
 df = pd.read_excel("equipmentData2.xlsx", keep_default_na=False)
 
-# df.index.values，获取行索引向量，返回类型为ndarray（一维）；
-# df.columns.values
-
-# print(len(df.values))
-# print(df.values[0])
 index = 0
 for i in df.values:
     Equipment = 'EQUIPMENT_' + ''.join([p.capitalize() for p in lazy_pinyin(i[1])])

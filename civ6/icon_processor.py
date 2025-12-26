@@ -1,15 +1,15 @@
 import glob
 import os
 
-from PIL import Image, ImageDraw
 # from wand import image as dds_image
-from pathlib import Path
 import imageio.v2 as imageio
+from PIL import Image, ImageDraw
+
 
 def read_dds_image(image_path):
     image_array = imageio.imread(image_path)
-    image = Image.fromarray(image_array)
-    return image
+    img = Image.fromarray(image_array)
+    return img
 
 
 
@@ -30,12 +30,12 @@ def apply_circle_mask(original_image):
     return result
 
 def get_dir_images(dir_path):
-    Image_glob = os.path.join(dir_path, "*.png")
-    Image_name_list = []
+    img_glob = os.path.join(dir_path, "*.png")
+    img_paths = []
 
-    Image_name_list.extend(glob.glob(Image_glob))
+    img_paths.extend(glob.glob(img_glob))
     _images = []
-    for i in range(len(Image_name_list)):
+    for i in range(len(img_paths)):
         _image = apply_circle_mask(read_dds_image(dir_path+'{id}.png'.format(id=(i+1))))
         _images.append(_image)
 
