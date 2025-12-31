@@ -3,6 +3,9 @@ from pypinyin import lazy_pinyin
 
 # -- ('EQUIPMENT_FangTianHuaJi', 'EQUIPMENT_WEAPON', 'LV_BU', 0, 20, NULL, NULL, 1, 9000, 0, 0, 0),
 equipment_sql = "('{e_name}', '{e_type}', '{e_hero}', 0, 20, NULL, NULL, 1, 9000, {e_armor}, 0, 0),"
+equipment_ab_modifier = "('ABILITY_TKH_{e_name}',\t\t\t\t'MODIFIER_{e_name}'),"
+ab_modifier = "('MODIFIER_{e_name}',\t\t\t'{m_type}',\t\t\t{req}),"
+ab_modifier_arguments = "('MODIFIER_{e_name}',        	'Amount',   {arg}),"
 
 icon = '<Row Name="ICON_{e_name}" Atlas="ATLAS_ICON_EQUIPMENTS_EX2" Index="{index}" />'
 
@@ -28,9 +31,13 @@ for i in df.values:
     # print(icon.format(e_name=Equipment, index=index))
     # index += 1
 
-    print(e_text.format(
-        equipment = Equipment,
-        e_name = i[1],
-        e_des = i[2]
-    ))
-
+    # print(e_text.format(
+    #     equipment = Equipment,
+    #     e_name = i[1],
+    #     e_des = i[2]
+    # ))
+    if i[3] != '':
+        # print(equipment_ab_modifier.format(e_name=Equipment,))
+        # print(ab_modifier.format(e_name=Equipment, m_type=i[3], req='NULL' if i[4] == '' else "'"+i[4]+"'"))
+        # print(ab_modifier_arguments.format(e_name=Equipment, arg=i[6]))
+        pass
