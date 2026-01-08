@@ -1,4 +1,5 @@
 import pandas as pd
+from fontTools.ttLib.tables.G__l_o_c import Gloc_header
 from pypinyin import lazy_pinyin
 
 
@@ -45,22 +46,21 @@ def write_aoe_ability_modifier(df, p=4):
     with open('TKH_PROMOTED_MODIFIER_AOE_ABILITY.sql', 'w', encoding='UTF-8') as file:
         # for _str in [aoe_ability_modifier, aoe_ability_argument, aoe_ability_type, aoe_ability_typeTag, aoe_ability,
         #              ability_modifier]:
-        for _str in [s_hero_skill_ability, s_hero_skill_tag, s_hero_skill_text, s_hero_skill_modifier]:
-            index = 0
-            for i in df.values:
-                hero = '_'.join([p.capitalize() for p in lazy_pinyin(i[0])]).upper()
-                if i[2] != '':
-                    file.write(f"('zh_Hans_CN', 'LOC_ABILITY_TK_S_HERO_SKILL_{hero}_{index - (index // 8)*8 + 1}_NAME', '{i[1]}'),\n")
-                file.write(
-                    f"('zh_Hans_CN', 'LOC_ABILITY_TK_S_HERO_SKILL_{hero}_{index - (index // 8) * 8 + 1}_DESCRIPTION', '{i[3]}'),\n")
-                # if i[2] == 'AOE':
+        # for _str in [s_hero_skill_ability, s_hero_skill_tag, s_hero_skill_text, s_hero_skill_modifier]:
+        index = 0
+        for i in df.values:
+            hero = '_'.join([p.capitalize() for p in lazy_pinyin(i[1])]).upper()
+            # if i[2] != '':
+            file.write(f"('zh_Hans_CN', 'LOC_ABILITY_TK_S_HERO_SKILL_{hero}_{index - (index // 8)*8 + 1}_NAME', '{i[2]}'),\n")
+            file.write(f"('zh_Hans_CN', 'LOC_ABILITY_TK_S_HERO_SKILL_{hero}_{index - (index // 8) * 8 + 1}_DESCRIPTION', '{i[4]}'),\n")
+            # if i[2] == 'AOE':
 
-                    # modifiers = i[2].split(',')
-                    # for i_ in range(len(modifiers)):
-                    #     file.write(_str.format(hero=hero, modifier=modifiers[i_],skill_index=index - (index // 8)*8 + 1))
-                    #     file.write('\n')
-                index += 1
-            file.write('\n\n\n')
+                # modifiers = i[2].split(',')
+                # for i_ in range(len(modifiers)):
+                #     file.write(_str.format(hero=hero, modifier=modifiers[i_],skill_index=index - (index // 8)*8 + 1))
+                #     file.write('\n')
+            index += 1
+        file.write('\n\n\n')
 
 def write_promoted_text(df):
     with open('TKH_HeroText.sql', 'w', encoding='UTF-8') as file:
@@ -98,7 +98,43 @@ def write_promoted_text(df):
 
 if __name__ == '__main__':
     df = pd.read_excel("hero_promotion_data.xlsx", keep_default_na=False)
-    write_aoe_ability_modifier(df)
+    # write_aoe_ability_modifier(df)
+
+    combat_types = {'ATTACK_': '攻击{target}单位',
+                    'DEFEND_': '防御{target}单位攻击',
+                    'COMBAT_': '与{target}单位战斗'}
+    combat_targets = ['CLASS_ANTI_CAVALRY', 'CLASS_RANGED',
+                      'CLASS_MELEE', 'CLASS_TKH_CAVALRY',
+                      'CLASS_TKH_HERO', 'CLASS_SIEGE',
+                      'CLASS_WARRIOR_MONK', 'CLASS_RECON']
+
+    combat_targets_ZH = ['抗骑兵', '远程', '近战', '骑兵', '英雄', '攻城', '武僧', '侦察']
+
+    modifier_string = r'''INSERT OR REPLACE INTO ModifierStrings(ModifierId,	Context,	Text)
+SELECT mod.ModifierId, 'Preview', '{loc}'
+FROM Modifiers mod JOIN ModifierArguments arg
+ON mod.ModifierId = arg.ModifierId
+AND mod.ModifierType = 'MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH' 
+AND mod.SubjectRequirementSetId = '{req}'
+AND mod.OwnerRequirementSetId IS NULL
+AND arg.Name = 'Amount'
+AND mod.ModifierId NOT IN (SELECT ModifierId FROM ModifierStrings);
+
+
+'''
+
+    for combat_type, loc_header in combat_types.items():
+        # print(combat_type, loc_header)
+        for i in range(len(combat_targets)):
+            # print(combat_targets[i], combat_targets_ZH[i])
+            req = f'REQS_TKH_{combat_type if combat_type != 'COMBAT_' else ''}TAG_IS_{combat_targets[i]}'
+
+            loc_zh = loc_header.format(target=combat_targets_ZH[i]) + '时+uuu [ICON_Strength] 战斗力'
+            # print(req, loc)
+            loc = f"('zh_Hans_CN', '{f'LOC_TKH_MOD_STRING_{combat_type}MINUS_{combat_targets[i]}'}', '{loc_zh}'),"
+            print(loc)
+
+
     # write_promoted_text(df)
     # with open('TKH_HeroText.sql', 'w', encoding='UTF-8') as file:
     #     index = 0
