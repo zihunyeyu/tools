@@ -9,35 +9,44 @@ ab_modifier_arguments = "('MODIFIER_{e_name}',        	'Amount',   {arg}),"
 
 icon = '<Row Name="ICON_{e_name}" Atlas="ATLAS_ICON_EQUIPMENTS_EX2" Index="{index}" />'
 
-e_text = r'''<Replace Tag="LOC_{equipment}_NAME" Language="zh_Hans_CN">
-			<Text>
-				{e_name}
-			</Text>
-		</Replace>
-		<Replace Tag="LOC_{equipment}_DESCRIPTION" Language="zh_Hans_CN">
-			<Text>
-				{e_name}：{e_des}
-			</Text>
-		</Replace>'''
 
-df = pd.read_excel("equipmentData2.xlsx", keep_default_na=False)
+df_equ = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False, sheet_name='equ')
+df_equ_sql = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False, sheet_name='equ_sql')
+df_suit = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False, sheet_name='suit')
 
-index = 0
-for i in df.values:
-    Equipment = 'EQUIPMENT_' + ''.join([p.capitalize() for p in lazy_pinyin(i[1])])
-    # print(i[3] == '')
-    # print(equipment_sql.format(e_name=Equipment, e_type=i[4], e_hero=i[5], e_armor=0 if i[3] == '' else i[3]))
 
-    # print(icon.format(e_name=Equipment, index=index))
-    # index += 1
+# for i in df.values:
+#     Equipment = 'EQUIPMENT_' + ''.join([p.capitalize() for p in lazy_pinyin(i[1])])
 
-    # print(e_text.format(
-    #     equipment = Equipment,
-    #     e_name = i[1],
-    #     e_des = i[2]
-    # ))
-    if i[3] != '':
-        # print(equipment_ab_modifier.format(e_name=Equipment,))
-        # print(ab_modifier.format(e_name=Equipment, m_type=i[3], req='NULL' if i[4] == '' else "'"+i[4]+"'"))
-        # print(ab_modifier_arguments.format(e_name=Equipment, arg=i[6]))
-        pass
+aoe_ability_modifier = r'''('MODIFIER_ALL_UNITS_GRANT_ABILITY',                     'MODIFIER_ABILITY_TKH_{suit}{suit_num}',      'AOE5_REQUIREMENTS'),'''
+aoe_ability_argument = r'''('AbilityType', 'MODIFIER_ABILITY_TKH_{suit}{suit_num}',  'ABILITY_MODIFIER_ABILITY_TKH_{suit}{suit_num}'),'''
+aoe_ability_type = r'''('ABILITY_MODIFIER_ABILITY_TKH_{suit}{suit_num}',	'KIND_ABILITY'),'''
+aoe_ability_typeTag = r'''('ABILITY_MODIFIER_ABILITY_TKH_{suit}{suit_num}',	'CLASS_UNIT_HERO_TKH_'),'''
+aoe_ability = r'''('ABILITY_MODIFIER_ABILITY_TKH_{suit}{suit_num}',	null,	'LOC_ABILITY_MODIFIER_ABILITY_TKH_{suit}{suit_num}_DESCRIPTION',	1,	0),'''
+# ability_modifier = r'''('ABILITY_MODIFIER_PROMOTION_TK_{hero}_{x}_{y}',	'MOD_ABILITY_MODIFIER_PROMOTION_TK_{hero}_{x}_{y}'),'''
+
+aoe = r'''('ABILITY_TKH_{suit}{suit_num}',	'MODIFIER_ABILITY_TKH_{suit}{suit_num}'),'''
+
+
+for i in df_suit.values:
+    suit_3 = f"LOC_{i[0]}_DESCRIPTION3"
+    suit_4 = f"LOC_{i[0]}_DESCRIPTION4"
+
+    print(f"('zh_Hans_CN',	'{suit_3}',	'{i[2]}'),")
+    print(f"('zh_Hans_CN',	'{suit_4}',	'{i[4]}'),")
+
+
+
+    
+
+# for equ in df_equ.values:
+#     Equipment = 'EQUIPMENT_' + ''.join([p.capitalize() for p in lazy_pinyin(equ[1])])
+#     index = 0
+#     for equ_sql in df_equ_sql.values:
+#
+#         if Equipment  == equ_sql[0] and equ[7] != '':
+#             # equ_sql[-2] = equ[7]
+#             df_equ_sql.loc[index, 16] = equ[7]
+#         index += 1
+#
+# df_equ_sql.to_excel("text.xlsx", sheet_name='equ_sql')

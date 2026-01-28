@@ -3,6 +3,40 @@ from fontTools.ttLib.tables.G__l_o_c import Gloc_header
 from pypinyin import lazy_pinyin
 
 
+#     combat_types = {'ATTACK_': '攻击{target}单位',
+#                     'DEFEND_': '防御{target}单位攻击',
+#                     'COMBAT_': '与{target}单位战斗'}
+#     combat_targets = ['CLASS_ANTI_CAVALRY', 'CLASS_RANGED',
+#                       'CLASS_MELEE', 'CLASS_TKH_CAVALRY',
+#                       'CLASS_TKH_HERO', 'CLASS_SIEGE',
+#                       'CLASS_WARRIOR_MONK', 'CLASS_RECON']
+#
+#     combat_targets_ZH = ['抗骑兵', '远程', '近战', '骑兵', '英雄', '攻城', '武僧', '侦察']
+#
+#     modifier_string = r'''INSERT OR REPLACE INTO ModifierStrings(ModifierId,	Context,	Text)
+# SELECT mod.ModifierId, 'Preview', '{loc}'
+# FROM Modifiers mod JOIN ModifierArguments arg
+# ON mod.ModifierId = arg.ModifierId
+# AND mod.ModifierType = 'MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH'
+# AND mod.SubjectRequirementSetId = '{req}'
+# AND mod.OwnerRequirementSetId IS NULL
+# AND arg.Name = 'Amount'
+# AND mod.ModifierId NOT IN (SELECT ModifierId FROM ModifierStrings);
+#
+#
+# '''
+#
+#     for combat_type, loc_header in combat_types.items():
+#         # print(combat_type, loc_header)
+#         for i in range(len(combat_targets)):
+#             # print(combat_targets[i], combat_targets_ZH[i])
+#             req = f'REQS_TKH_{combat_type if combat_type != 'COMBAT_' else ''}TAG_IS_{combat_targets[i]}'
+#
+#             loc_zh = loc_header.format(target=combat_targets_ZH[i]) + '时+uuu [ICON_Strength] 战斗力'
+#             # print(req, loc)
+#             loc = f"('zh_Hans_CN', '{f'LOC_TKH_MOD_STRING_{combat_type}MINUS_{combat_targets[i]}'}', '{loc_zh}'),"
+#             print(loc)
+
 
 promotion_text = r'''<Replace Tag="LOC_PROMOTION_TK_{hero}_{x}_{y}_NAME" Language="zh_Hans_CN">
 			<Text>
@@ -97,48 +131,14 @@ def write_promoted_text(df):
 #         index += 1
 
 if __name__ == '__main__':
-    df = pd.read_excel("hero_promotion_data.xlsx", keep_default_na=False)
+    # df = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False)
     # write_aoe_ability_modifier(df)
 
-    combat_types = {'ATTACK_': '攻击{target}单位',
-                    'DEFEND_': '防御{target}单位攻击',
-                    'COMBAT_': '与{target}单位战斗'}
-    combat_targets = ['CLASS_ANTI_CAVALRY', 'CLASS_RANGED',
-                      'CLASS_MELEE', 'CLASS_TKH_CAVALRY',
-                      'CLASS_TKH_HERO', 'CLASS_SIEGE',
-                      'CLASS_WARRIOR_MONK', 'CLASS_RECON']
-
-    combat_targets_ZH = ['抗骑兵', '远程', '近战', '骑兵', '英雄', '攻城', '武僧', '侦察']
-
-    modifier_string = r'''INSERT OR REPLACE INTO ModifierStrings(ModifierId,	Context,	Text)
-SELECT mod.ModifierId, 'Preview', '{loc}'
-FROM Modifiers mod JOIN ModifierArguments arg
-ON mod.ModifierId = arg.ModifierId
-AND mod.ModifierType = 'MODIFIER_UNIT_ADJUST_COMBAT_STRENGTH' 
-AND mod.SubjectRequirementSetId = '{req}'
-AND mod.OwnerRequirementSetId IS NULL
-AND arg.Name = 'Amount'
-AND mod.ModifierId NOT IN (SELECT ModifierId FROM ModifierStrings);
+    def change_extra_armor(n_max):
+        current_armor = 70
+        max_armor = 100
+        extra_max_armor = n_max
 
 
-'''
-
-    for combat_type, loc_header in combat_types.items():
-        # print(combat_type, loc_header)
-        for i in range(len(combat_targets)):
-            # print(combat_targets[i], combat_targets_ZH[i])
-            req = f'REQS_TKH_{combat_type if combat_type != 'COMBAT_' else ''}TAG_IS_{combat_targets[i]}'
-
-            loc_zh = loc_header.format(target=combat_targets_ZH[i]) + '时+uuu [ICON_Strength] 战斗力'
-            # print(req, loc)
-            loc = f"('zh_Hans_CN', '{f'LOC_TKH_MOD_STRING_{combat_type}MINUS_{combat_targets[i]}'}', '{loc_zh}'),"
-            print(loc)
 
 
-    # write_promoted_text(df)
-    # with open('TKH_HeroText.sql', 'w', encoding='UTF-8') as file:
-    #     index = 0
-    #     s_heroes = []
-    #     for i in df.values:
-    #         _i = index - (index // 8)*8 + 1
-    #         hero_name = '_'.join([p.capitalize() for p in lazy_pinyin(i[0])]).upper()

@@ -90,12 +90,40 @@ def trim_white_border(image_source: str):
     cv2.imwrite(os.path.join(image_source.replace(file_name, ""), name+'_process.'+ext), res_image)
     # return res_image
 
+from PIL import Image
+import os
+
+def dds_to_png(dds_path, png_path):
+    try:
+        # 打开 DDS 文件
+        img = Image.open(dds_path)
+        # 保存为 PNG 格式
+        img.save(png_path, 'png')
+        print(f"成功转换: {dds_path} -> {png_path}")
+    except Exception as e:
+        print(f"转换失败: {dds_path}, 错误: {e}")
+
+def convert_dds_to_png(input_folder, output_folder):
+    # 示例: 转换单个文件
+    # dds_file = 'your_image.dds'
+    # png_file = 'your_image.png'
+    # dds_to_png(dds_file, png_file)
+
+    # 示例: 批量转换文件夹内的所有 DDS 文件
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    for filename in os.listdir(input_folder):
+        print(filename)
+        if filename.lower().endswith('.dds'):
+            dds_path = os.path.join(input_folder, filename)
+            # 构建输出 PNG 文件名
+            base_name = os.path.splitext(filename)[0]
+            png_path = os.path.join(output_folder, f"{base_name}.png")
+            dds_to_png(dds_path, png_path)
+
+
 
 if __name__ == '__main__':
-    # card_en_datas = convert_obj_zhHans(card_en_datas)
-    # print(convert_obj_zhHans('羅蘭·班克斯'))
-    # pprint(convert_obj_zhHans(__get_json_test()))
-    # test_image = Image.open("D:\\temp1\\test.jpg")
-    trim_white_border("D:\\temp1\\test.jpg")
-    # cv2.imwrite(os.path.join("D:\\temp1\\", "res_0923.jpg"), img)
+    convert_dds_to_png("./icon_unit_portrait/", './icon_unit_portrait/')
     pass
