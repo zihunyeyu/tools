@@ -131,13 +131,19 @@ def write_promoted_text(df):
 #         index += 1
 
 if __name__ == '__main__':
-    # df = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False)
+    df = pd.read_excel("TKH_DATA.xlsx", keep_default_na=False, sheet_name='s_hero')
     # write_aoe_ability_modifier(df)
 
-    def change_extra_armor(n_max):
-        current_armor = 70
-        max_armor = 100
-        extra_max_armor = n_max
+    for i in df.values:
+        hero = '_'.join([p.capitalize() for p in lazy_pinyin(i[1])]).upper()
+
+        if i[9] == '小回复术':
+            print(f'PROMOTION_TK_{hero}_3_2 = 10, ')
+
+    # def change_extra_armor(n_max):
+    #     current_armor = 70
+    #     max_armor = 100
+    #     extra_max_armor = n_max
 
 
 
