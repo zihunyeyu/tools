@@ -1,10 +1,22 @@
 import re
 import os
 import json
-from pprint import pprint
 from pydoftools.npk import NPK
 from pydoftools.npk.img.version import IMGv6
 
+from arkham.extract_pic_from_tts import card_images
+
+jobs = ['sm', 'gg', 'gn', 'ft', 'fm', 'mg', 'mm', 'pr', 'th']
+jobs_full = ['swordman', 'gunner_at', 'gunner', 'fighter', 'fighter_at', 'mage', 'mage_at', 'priest', 'thief']
+parts = ['belt', 'cap', 'coat', 'face', 'hair', 'neck', 'pants', 'shoes']
+
+kr_dir = 'D:\\BaiduNetdiskDownload\\ImagePacks2\\'
+jp_dir = 'E:\\DOF\\Tools\\blackcat.6.12\\output\\Download\\日本-正式服\\'
+na_ir = 'E:\\DOF\\Tools\\blackcat.6.12\\output\\Download\\北美地区-正式服\\'
+compile_dir = 'E:\\DOF\\Tools\\blackcat.6.12\\compiles\\'
+
+
+layers = {}
 
 # 核心拆分函数
 def split_mixed_string(s):
@@ -14,7 +26,7 @@ def split_mixed_string(s):
 
 # 初始化字典 & 指定路径
 avatar_dict = {}
-npk_folder = "npk_files"
+npk_folder = "E:\\DOF\\Tools\\blackcat.6.12\\compiles"
 output_json_path = "avatar_data.json"  # 输出的JSON文件路径
 
 # 遍历NPK文件
@@ -22,17 +34,36 @@ if not os.path.exists(npk_folder):
     print(f"错误：文件夹 {npk_folder} 不存在！")
 else:
     for file_name in os.listdir(npk_folder):
+
         if not file_name.lower().endswith(".npk"):
             continue
-
         npk_path = os.path.join(npk_folder, file_name)
-        print(f"解析中: {npk_path}")
 
         try:
             with open(npk_path, "rb") as f:
                 npk = NPK.open(f)
                 npk.load_all()
+                # 合并其他区服NPK
+                # for c_dir in [jp_dir, kr_dir, na_ir]:
+                #     c_path = os.path.join(c_dir, file_name)
+                #     try:
+                #         with open(c_path, 'rb') as c_f:
+                #             c_npk = NPK.open(c_f)
+                #             c_npk.load_all()
+                #             npk.files.extend(c_npk.files)
+                #     except:
+                #         pass
+                #
+                # unique_dict = {}
+                # for file in npk.files:
+                #     unique_dict[file.name] = file  # 覆盖重复值
+                # unique_files = list(unique_dict.values())
+                # npk.files.clear()
+                # npk.files.extend(unique_files)
+                # with open(os.path.join(compile_dir, file_name), 'wb') as out_io:
+                #     npk.save(out_io, True)
 
+                # 处理IMGs
                 for nf in npk.files:
                     # 清理文件名 & 过滤无效文件
                     name = nf.name.split('/')[-1].replace('.img', '')
@@ -41,8 +72,15 @@ else:
 
                     # 拆分信息
                     job, info = name.split('_', 1)
+                    if job not in jobs:
+                        continue
+
                     part, code, layer = split_mixed_string(info)
-                    if not all([part, code, layer]):
+
+                    if layer not in layers.keys():
+                        layers[layer] = True
+
+                    if part not in parts or not all([part, code, layer]):
                         continue
 
                     # 处理编号/索引
@@ -86,5 +124,5 @@ try:
 except Exception as e:
     print(f"\n写入JSON文件失败: {str(e)}")
 
-# 控制台打印预览
-# pprint(avatar_dict)
+
+print(layers.keys())

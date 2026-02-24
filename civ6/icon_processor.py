@@ -62,7 +62,7 @@ if __name__ == '__main__':
     # root = r'C:\Users\10704\PycharmProjects\PythonProject\civ6\save_images'  # 保存地址
 
 
-    images = get_dir_images('./icon_unit_portrait/')
+    images = get_dir_images('./合并图片/')
     concatenated_image_horizontal = Image.new("RGBA", (3000, 300*(len(images)//10+1)), (0,0,0,0))
 
     index = 0
