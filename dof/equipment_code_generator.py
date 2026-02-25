@@ -15,9 +15,11 @@ from tsv_validator import EquipmentTagValidator
 from pvf_api_client import PvfUtilityApi
 from config import (
     JOB_MAP, PART_CODE_MAP,
-    EQU_PATH_TEMPLATE, EQUIPMENT_LST, AVATAR_DATA_JSON,
+    EQU_PATH_TEMPLATE, EQUIPMENT_LST, SHOP_ETC, AVATAR_DATA_JSON,
     PVF_API_HOST, PVF_API_PORT, BASE_DIR
 )
+from equ_template_cache import EquTemplateCache, init_template_cache
+from avatar_table_loader import AvatarTableLoader, construct_code, generate_equ_name
 
 # 配置日志
 logging.basicConfig(
@@ -122,6 +124,11 @@ class EquFileGenerator:
     Equ 文件生成器
     
     根据 avatar 数据生成对应的 equ 文件内容。
+    
+    支持两种模板获取方式（按优先级）：
+    1. EquTemplateCache - 从 equ_models.py 指定的代码预加载的模板
+    2. PVF 实时获取 - 从 PVF 中搜索现有 equ 文件作为模板
+    3. 基础模板 - 使用内置的基础模板
     """
     
     # 部位到装备类型的映射
@@ -181,7 +188,7 @@ class EquFileGenerator:
         'coat': 'acoat',
         'pants': 'apants',
         'belt': 'awaist',
-        'neck': 'abreast',
+        'neck': 'aneck',
         'shoes': 'ashoes',
         'cap': 'acap',
         'hair': 'ahair',
@@ -202,16 +209,66 @@ class EquFileGenerator:
         'th': 'equipment/character/thief.lay',
     }
     
-    def __init__(self, pvf_api: Optional[PvfUtilityApi] = None):
+    # Job 到 icon 路径和缩写的映射（用于重新生成 icon 路径）
+    # 格式: job: (路径名, 文件名前缀)
+    # 注意: 转职/特定性别职业有特殊的文件夹命名
+    JOB_ICON_MAP_DETAILED = {
+        'sm': ('swordman', 'sm'),
+        'ft': ('fighter', 'ft'),      # 格斗家(女)
+        'fm': ('atfighter', 'fm'),    # 格斗家(男) - 转职后路径
+        'gn': ('gunner', 'gn'),       # 神枪手(男)
+        'gg': ('atgunner', 'gg'),     # 神枪手(女) - 转职后路径
+        'mg': ('mage', 'mg'),         # 魔法师(女)
+        'mm': ('atmage', 'mm'),       # 魔法师(男) - 转职后路径
+        'pr': ('priest', 'pr'),
+        'th': ('thief', 'tf'),        # thief 的缩写是 tf
+    }
+    
+    # 部位到 icon 文件缩写的映射
+    PART_ICON_ABBREV = {
+        'coat': 'acoat',
+        'pants': 'apants',
+        'belt': 'abelt',
+        'neck': 'aneck',
+        'shoes': 'ashoes',
+        'cap': 'acap',
+        'hair': 'ahair',
+        'face': 'aface',
+        'skin': 'abody',
+    }
+    
+    def __init__(self, pvf_api: Optional[PvfUtilityApi] = None, use_cache: bool = True, avatar_table_loader: Optional[AvatarTableLoader] = None):
         """
         初始化 Equ 文件生成器
         
         Args:
             pvf_api: PVF API 客户端，用于获取模板
+            use_cache: 是否使用 EquTemplateCache，默认为 True
+            avatar_table_loader: 装扮表加载器，用于获取 name 和 icon_index
         """
         self._pvf_api = pvf_api
         self._templates: Dict[str, str] = {}
         self._layer_dict = layer_dict
+        self._template_cache: Optional[EquTemplateCache] = None
+        self._avatar_loader: Optional[AvatarTableLoader] = avatar_table_loader
+        
+        # 初始化模板缓存
+        if use_cache:
+            try:
+                self._template_cache = init_template_cache()
+                logger.info("EquFileGenerator: 已启用模板缓存")
+            except Exception as e:
+                logger.warning(f"EquFileGenerator: 初始化模板缓存失败: {e}，将使用 PVF 实时获取")
+        
+        # 初始化装扮表加载器
+        if self._avatar_loader is None:
+            try:
+                # 默认路径
+                avatar_base_path = r'E:\DOF\Tools\blackcat.6.12\output\Avatar'
+                self._avatar_loader = AvatarTableLoader(avatar_base_path)
+                logger.info("EquFileGenerator: 已初始化装扮表加载器")
+            except Exception as e:
+                logger.warning(f"EquFileGenerator: 初始化装扮表加载器失败: {e}")
     
     def _get_template_key(self, job_name: str, part_name: str) -> str:
         """获取模板键"""
@@ -361,6 +418,45 @@ class EquFileGenerator:
         
         return f"{base_path}/{job_prefix}_{icon_file}.img"
     
+    def _replace_name_tag(self, content: str, name: str) -> str:
+        """
+        替换 [name] 标签内容
+        
+        Args:
+            content: 原始内容
+            name: 新的 name 值
+            
+        Returns:
+            替换后的内容
+        """
+        # 匹配 [name]\n\t`...`
+        pattern = r'(\[name\]\s*\n\s*`)([^`]+)(`)'
+        return re.sub(pattern, rf'\g<1>{name}\g<3>', content, count=1)
+    
+    def _replace_icon_tag(self, content: str, icon_path: str, icon_index: int) -> str:
+        """
+        替换 [icon] 标签内容
+        
+        Args:
+            content: 原始内容
+            icon_path: 新的 icon 路径
+            icon_index: 图标索引
+            
+        Returns:
+            替换后的内容
+        """
+        # 匹配 [icon]\n\t`...`\t{index}
+        # 需要处理不同的换行符格式
+        pattern = r'(\[icon\]\s*\r?\n\s*`)([^`]+)(`\s+)(\d+)'
+        
+        def replace_icon(match):
+            prefix = match.group(1)
+            # 原路径不保留，使用新路径
+            middle = match.group(3)
+            return f'{prefix}{icon_path}{middle}{icon_index}'
+        
+        return re.sub(pattern, replace_icon, content, count=1)
+    
     def _get_layer_index(self, part_name: str, layer: str) -> int:
         """
         获取 layer 的索引值
@@ -374,6 +470,49 @@ class EquFileGenerator:
         """
         key = f"{part_name}_{layer}"
         return self._layer_dict.get(key, 1000)
+    
+    def _generate_icon_path(self, job_name: str, part_name: str) -> str:
+        """
+        生成 icon 路径
+        
+        格式: item/avatar/{job_path}/{job_prefix}_{part_icon}.img
+        
+        Args:
+            job_name: 职业代码
+            part_name: 部位代码
+            
+        Returns:
+            icon 路径
+        """
+        job_path, job_prefix = self.JOB_ICON_MAP_DETAILED.get(job_name, (job_name, job_name))
+        part_icon = self.PART_ICON_ABBREV.get(part_name, f'a{part_name}')
+        return f"item/avatar/{job_path}/{job_prefix}_{part_icon}.img"
+    
+    def _get_equ_name_and_icon(self, job_name: str, part_name: str, avatar_code: int, suffix: int) -> Tuple[str, int]:
+        """
+        获取 equ 的 name 和 icon_index
+        
+        优先从装扮表查找，找不到使用默认格式
+        
+        Args:
+            job_name: 职业代码
+            part_name: 部位代码
+            avatar_code: avatar 变体代码
+            suffix: 后缀索引
+            
+        Returns:
+            (name, icon_index)
+        """
+        if self._avatar_loader:
+            name, icon_index, found = generate_equ_name(
+                job_name, part_name, avatar_code, suffix, self._avatar_loader
+            )
+            return name, icon_index
+        else:
+            # 装扮表加载器不可用，使用默认格式
+            code = construct_code(avatar_code, suffix)
+            default_name = f"{job_name}_{part_name}_{code}"
+            return default_name, 0
     
     def _build_layer_variations(
         self,
@@ -404,7 +543,7 @@ class EquFileGenerator:
     
     def get_template(self, job_name: str, part_name: str) -> str:
         """
-        获取模板，优先从PVF获取，否则使用基础模板
+        获取模板，优先级：缓存 > PVF实时获取 > 基础模板
         
         Args:
             job_name: 职业名称
@@ -416,14 +555,25 @@ class EquFileGenerator:
         key = self._get_template_key(job_name, part_name)
         
         if key not in self._templates:
-            # 尝试从PVF获取
-            template = self._fetch_template_from_pvf(job_name, part_name)
+            template = None
+            
+            # 1. 优先从缓存获取（基于 equ_models.py 的指定代码）
+            if self._template_cache:
+                cache_template = self._template_cache.get_template(job_name, part_name)
+                if cache_template:
+                    template = cache_template.content
+                    logger.debug(f"从缓存获取模板: {key} (code: {cache_template.code})")
+            
+            # 2. 缓存未命中，尝试从PVF实时获取
+            if template is None and self._pvf_api:
+                template = self._fetch_template_from_pvf(job_name, part_name)
+                if template:
+                    logger.debug(f"从PVF获取模板: {key}")
+            
+            # 3. 使用基础模板
             if template is None:
-                # 使用基础模板
                 template = self._build_template(job_name, part_name)
                 logger.debug(f"使用基础模板: {key}")
-            else:
-                logger.debug(f"从PVF获取模板: {key}")
             
             self._templates[key] = template
         
@@ -459,8 +609,22 @@ class EquFileGenerator:
             job_name, part_name, layers_to_use
         )
         
+        # 获取 name 和 icon_index（从装扮表或默认格式）
+        equ_name, icon_index = self._get_equ_name_and_icon(
+            job_name, part_name, avatar_index.code, suffix
+        )
+        
+        # 生成 icon 路径
+        icon_path = self._generate_icon_path(job_name, part_name)
+        
         # 替换模板中的变量
         content = template
+        
+        # 替换 name 标签
+        content = self._replace_name_tag(content, equ_name)
+        
+        # 替换 icon 标签
+        content = self._replace_icon_tag(content, icon_path, icon_index)
         
         # 替换 variation_code 和 suffix
         content = content.replace('{{variation_code}}', str(avatar_index.code))
@@ -526,7 +690,7 @@ class EquipmentCodeGenerator:
         existing_lst_path: Optional[str] = None,
         equ_output_dir: Optional[Path] = None,
         generate_equ_files: bool = True,
-        max_equ_per_job_part: Optional[int] = 10  # 新增：限制每个职业部位生成的equ数量
+        max_equ_per_job_part: Optional[int] = None  # 新增：限制每个职业部位生成的equ数量
     ):
         """
         初始化生成器
@@ -903,9 +1067,34 @@ class EquipmentCodeGenerator:
         
         with open(output_path, 'w', encoding='utf-8', newline='') as f:
             for code, path in sorted_items:
-                f.write(f"{code}\t{path}\n")
+                f.write(f"{code}\t{path.replace('equipment/', '')}\n")
         
         logger.info(f"已写入 {len(sorted_items)} 条记录到 {output_path}")
+    
+    def write_shop_etc(self, output_path: Path) -> None:
+        """
+        写入 shop.etc 文件
+        
+        格式: 133012\t{equ_code}\t3\t0\t0\t-1\t-1\t{equ_code}\t4\t0\t0\t-1
+        
+        Args:
+            output_path: 输出文件路径
+        """
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        sorted_codes = sorted(self._equ_codes.keys(), key=lambda x: int(x))
+        
+        start_index = 133012+1000  # shop.etc 中的编码从 133012 开始，后续递增
+        
+        with open(output_path, 'w', encoding='utf-8', newline='') as f:
+            for equ_code in sorted_codes:
+                # 格式: 133012\t{equ_code}\t3\t0\t0\t-1\t-1\t{equ_code}\t4\t0\t0\t-1
+                line = f"\t{start_index}\t{equ_code}\t3\t0\t0\t-1\t-1\t{equ_code}\t4\t0\t0\t-1\n"
+                f.write(line)
+                start_index += 1
+        
+        logger.info(f"已写入 {len(sorted_codes)} 条记录到 {output_path}")
     
     def write_equ_files(self, output_dir: Optional[Path] = None) -> int:
         """
@@ -1039,6 +1228,10 @@ class EquipmentCodeGenerator:
         if write_equ_to_local and self._generate_equ_files:
             equ_count = self.write_equ_files()
         
+        # 5. 写入 shop.etc
+        shop_path = Path(output_path).parent / "shop.etc"
+        self.write_shop_etc(shop_path)
+        
         # 5. 导入到 PVF
         imported_count = 0
         if import_to_pvf and self._generate_equ_files:
@@ -1065,15 +1258,41 @@ class EquipmentCodeGenerator:
 
 def main():
     """主入口"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='装备编码生成器')
+    parser.add_argument('--local', '-l', action='store_true', 
+                        help='保存 equ 文件到本地（默认直接上传到 PVF）')
+    parser.add_argument('--no-upload', action='store_true',
+                        help='不上传到 PVF（仅保存到本地）')
+    
+    args = parser.parse_args()
+    
     generator = EquipmentCodeGenerator()
+    
+    # 默认行为：不保存本地，直接上传 PVF
+    write_local = args.local or args.no_upload  # 如果指定 --local 或 --no-upload 则保存本地
+    upload_pvf = not args.no_upload  # 默认上传，除非指定 --no-upload
+    
     try:
+        print("=" * 70)
+        print("装备编码生成器")
+        print("=" * 70)
+        print(f"\n配置:")
+        print(f"  - 写入本地: {write_local}")
+        print(f"  - 上传到 PVF: {upload_pvf}")
+        print(f"\n提示: 默认直接上传到 PVF，使用 --local 保存到本地，使用 --no-upload 只生成本地文件")
+        
         stats = generator.generate(
             json_path=AVATAR_DATA_JSON,
             output_path=EQUIPMENT_LST,
-            write_equ_to_local=True,
-            import_to_pvf=False  # 默认不导入到PVF，避免意外修改
+            write_equ_to_local=write_local,
+            import_to_pvf=upload_pvf
         )
-        print(f"\n生成统计:")
+        
+        print(f"\n" + "=" * 70)
+        print("生成统计:")
+        print("=" * 70)
         print(f"  - 新装备编码数: {stats['total_codes']}")
         print(f"  - PVF已有装备数: {stats['existing_codes']}")
         print(f"  - 错误数: {stats['error_count']}")
@@ -1082,6 +1301,10 @@ def main():
             print(f"  - Equ文件生成数: {stats['equ_files_generated']}")
             print(f"  - Equ文件本地写入数: {stats['equ_files_written']}")
             print(f"  - Equ文件PVF导入数: {stats['equ_files_imported']}")
+        
+        if upload_pvf:
+            print(f"\n✓ 文件已成功上传到 PVF 的 equipment/character/{{job}}avatar/{{part}}/ 目录")
+        
     except Exception as e:
         logger.error(f"生成失败: {e}")
         raise

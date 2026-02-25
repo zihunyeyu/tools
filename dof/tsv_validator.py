@@ -19,7 +19,7 @@ class EquipmentTagValidator:
         Args:
             tsv_path: TSV 文件路径，默认为当前目录下的 complete_equipment_tags.tsv
         """
-        self.tsv_path = tsv_path or Path("complete_equipment_tags.tsv")
+        self.tsv_path = tsv_path or Path("output/complete_equipment_tags.tsv")
         self._data: Set[Tuple[str, str, str]] = set()
         self._loaded = False
     
@@ -74,6 +74,8 @@ class EquipmentTagValidator:
         Returns:
             记录到验证结果的字典映射
         """
+        print(f"正在批量验证 {len(items)} 条记录...")
+        print(items[0])
         return {item: self.verify(item) for item in items}
     
     def reload(self) -> None:

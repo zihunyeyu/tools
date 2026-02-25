@@ -15,6 +15,7 @@ NPK_INPUT_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\NPK")
 NPK_BASE_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\base")
 NPK_COMPILE_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\compiles")
 NPK_OUTPUT_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\deduplicated_npk")
+
 NPK_KR_DIR = Path(r"D:\BaiduNetdiskDownload\ImagePacks2\\")
 NPK_JP_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\日本-正式服\\")
 NPK_NA_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\北美地区-正式服\\")
@@ -23,9 +24,10 @@ NPK_NA_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\北美地区-正�
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)
 
-AVATAR_DATA_JSON = BASE_DIR / "avatar_data.json"
-EQUIPMENT_TAGS_TSV = BASE_DIR / "complete_equipment_tags.tsv"
-EQUIPMENT_LST = BASE_DIR / "equ.lst"
+AVATAR_DATA_JSON = BASE_DIR / "output/avatar_data.json"
+EQUIPMENT_TAGS_TSV = BASE_DIR / "output/complete_equipment_tags.tsv"
+EQUIPMENT_LST = BASE_DIR / "output/equ.lst"
+SHOP_ETC = BASE_DIR / "output/shop.etc"
 
 # PVF API 配置
 PVF_API_HOST = "localhost"
@@ -62,8 +64,8 @@ PartConfig = Tuple[int, str]
 PART_CODE_MAP: Dict[str, PartConfig] = {
     'coat': (0, 'coat'),
     'pants': (1, 'pants'),
-    'belt': (2, 'waist'),
-    'neck': (3, 'breast'),
+    'neck': (2, 'breast'),
+    'belt': (3, 'waist'),
     'shoes': (4, 'shoes'),
     'cap': (5, 'hat'),
     'hair': (6, 'hair'),
@@ -86,7 +88,7 @@ PART_EQU_TYPE_MAP: Dict[str, str] = {
 PARTS: Tuple[str, ...] = tuple(PART_CODE_MAP.keys())
 
 # ==================== 装备路径模板 ====================
-EQU_PATH_TEMPLATE = "`character/{job}avatar/{part}/{code}.equ`"
+EQU_PATH_TEMPLATE = "`equipment/character/{job}avatar/{part}/{code}.equ`"
 
 # ==================== NPK 处理配置 ====================
 NPK_CONFIG = {

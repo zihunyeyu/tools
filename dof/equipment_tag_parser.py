@@ -427,6 +427,9 @@ class PvfEquipmentParser:
             path_parts = path.split('/')
             career = path_parts[2] if len(path_parts) >= 3 else path
             
+            if 'at_avatar' in path:
+                career = 'at '+career
+            
             lines.append(f"{code}\t{career}\t{tags.equipment_type}\t{tags.variation}\n")
         
         with open(output_file, 'w', encoding='utf-8', newline='') as f:

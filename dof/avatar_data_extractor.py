@@ -218,6 +218,9 @@ class AvatarDataExtractor:
         data = self.extract()
         output_path = Path(output_path or AVATAR_DATA_JSON)
         
+        # 确保目录存在
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        
         with open(output_path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=indent, ensure_ascii=False)
         
