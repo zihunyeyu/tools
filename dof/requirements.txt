@@ -1,0 +1,13 @@
+# DNF Tools 依赖
+# Python >= 3.10
+
+# HTTP 请求
+requests>=2.28.0
+urllib3>=1.26.0
+
+# NPK 文件处理
+# pydoftools 需要通过其他方式安装，不在 PyPI 上
+# pip install git+https://github.com/your-repo/pydoftools.git
+
+# 类型提示（Python < 3.9 需要）
+# typing-extensions>=4.0.0; python_version < "3.9"

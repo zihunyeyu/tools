@@ -123,6 +123,31 @@ def convert_dds_to_png(input_folder, output_folder):
             dds_to_png(dds_path, png_path)
 
 
+def find_max_between_two_nums(num_list, num1, num2):
+    """
+    在数字列表中查找指定两个数字之间（包含边界）的最大值
+
+    参数:
+        num_list (list): 待查找的数字列表
+        num1 (int/float): 范围下限（或上限，函数会自动识别）
+        num2 (int/float): 范围上限（或下限，函数会自动识别）
+
+    返回:
+        int/float: 范围内的最大值；若无符合条件的数，返回 None
+    """
+    # 先确定范围的上下限（避免用户输入的 num1 大于 num2）
+    lower = min(num1, num2)
+    upper = max(num1, num2)
+
+    # 筛选出在 [lower, upper] 范围内的数字
+    filtered_nums = [num for num in num_list if lower <= num <= upper]
+
+    # 判断是否有符合条件的数字，有则返回最大值，无则返回 None
+    if filtered_nums:
+        return max(filtered_nums)
+    else:
+        return None
+
 
 if __name__ == '__main__':
     convert_dds_to_png("./icon_unit_portrait/", './icon_unit_portrait/')
