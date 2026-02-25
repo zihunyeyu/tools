@@ -1,0 +1,59 @@
+#PVF_File
+
+[name]
+	`阿拉德萌动小兽礼包1 (鬼剑士)`
+
+[flavor text]
+	`<阿拉德萌动小兽礼包>`
+
+[grade]
+	1
+
+[attach type]
+	`[trade]`
+
+[rarity]
+	2
+
+[usable job]
+	`[all]`
+[/usable job]
+
+[minimum level]
+	1
+
+[icon]
+	`item/avatar/swordman/sm_acap.img`	745
+
+[stackable type]
+	`[usable cera package]`	0
+
+[move wav]
+	`CLOTH_TOUCH`
+
+[package data]
+	601550202	1
+	601560133	1
+	601570104	1
+	601520117	1
+	601500168	1
+	601510141	1
+	601530111	1
+	601540138	1
+	490706326	1
+	490706327	1
+[/package data]
+
+[suitable job]
+	`[swordman]`
+[/suitable job]
+
+[impossible contents]
+	`gift`
+[/impossible contents]
+
+[stack limit]
+	1
+
+[icon mark]
+	`Item/IconMark.img`	64
