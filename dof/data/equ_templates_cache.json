@@ -648,6 +648,14 @@
       "file_path": "equipment/character/gunner/avatar/skin/chn_equ_special_avatar_gunner_skin_104580158.equ",
       "content": "#PVF_File\r\n\r\n[name]\r\n\t`奶色战龙骑士皮肤`\r\n\r\n[grade]\r\n\t2\r\n\r\n[attach type]\r\n\t`[trade]`\r\n\r\n[usable job]\r\n\t`[gunner]`\r\n[/usable job]\r\n\r\n[minimum level]\r\n\t1\r\n\r\n[icon]\r\n\t`item/avatar/gunner/gn_abody.img`\t11\r\n\r\n[equipment type]\r\n\t`[skin avatar]`\t0\r\n\r\n[avatar type select]\r\n\t7\t0\t0\t300\t0\r\n\t30\t0\t0\t660\t0\r\n\t0\t0\t0\t1980\t0\r\n\t0\t0\t0\t4500\t2\r\n\t`[D socket]`\t`[D socket]`\r\n[/avatar type select]\r\n\r\n[animation job]\r\n\t`[gunner]`\r\n\r\n[variation]\r\n\t0\t11\r\n\r\n[move wav]\r\n\t`CLOTH_TOUCH`\r\n\r\n[avatar func filter]\r\n\t2\r\n\r\n[hit recovery]\r\n\t90\r\n\r\n[avatar select ability]\r\n\t`[PHYSICAL ABSOLUTE DEFENSE]`\t`+`\t3.5\r\n\t`[MAGICAL ABSOLUTE DEFENSE]`\t`+`\t3.5\r\n[/avatar select ability]\r\n",
       "version": 1
+    },
+    "fm_body": {
+      "job": "fm",
+      "part": "body",
+      "code": "103580153",
+      "file_path": "equipment/character/fighter/at_avatar/skin/chn_equ_special_avatar_at_fighter_skin_103580153.equ",
+      "content": "#PVF_File\r\n\r\n[name]\r\n\t`奶色碎夜铭典皮肤`\r\n\r\n[grade]\r\n\t2\r\n\r\n[attach type]\r\n\t`[trade]`\r\n\r\n[usable job]\r\n\t`[at fighter]`\r\n[/usable job]\r\n\r\n[minimum level]\r\n\t1\r\n\r\n[icon]\r\n\t`item/avatar/atfighter/fm_abody.img`\t10\r\n\r\n[equipment type]\r\n\t`[skin avatar]`\t0\r\n\r\n[animation job]\r\n\t`[at fighter]`\r\n\r\n[variation]\r\n\t0\t10\r\n\r\n[move wav]\r\n\t`CLOTH_TOUCH`\r\n\r\n[hit recovery]\r\n\t90\r\n\r\n[avatar select ability]\r\n\t`[PHYSICAL ABSOLUTE DEFENSE]`\t`+`\t3.5\r\n\t`[MAGICAL ABSOLUTE DEFENSE]`\t`+`\t3.5\r\n[/avatar select ability]\r\n\r\n[avatar type select]\r\n\t7\t0\t0\t1000\t0\r\n\t30\t0\t0\t2000\t0\r\n\t0\t0\t0\t4000\t0\r\n\t0\t0\t0\t4400\t2\r\n\t`[M socket]`\t`[M socket]`\r\n[/avatar type select]\r\n",
+      "version": 1
     }
   }
 }
