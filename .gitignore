@@ -5,3 +5,6 @@ arkham/__pycache__
 dof/__pycache__
 dof/icon_cache
 dof/output
+dof/main/__pycache__
+dof/modules/__pycache__
+dof/model/__pycache__
