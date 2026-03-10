@@ -2148,18 +2148,19 @@ class SuitLoader:
         return config
 
     def _migrate_config(self, config: Dict, job_key: Optional[str] = None) -> Dict:
-        """迁移旧版配置到新版统一格式
+        """迁移旧版配置到新版统一格式（优化版：移除icon_type字段）
 
         Args:
             config: 配置字典
             job_key: 职业key，如果提供则保存迁移后的配置
 
         迁移内容：
-        1. 不自动添加icon_type，保留原样（无icon_type表示无图标）
+        1. 移除icon_type字段，通过img字段判断是否为自定义图标
         2. frame=-1表示明确无图标
         3. hide_parts默认为[]
-        4. 将custom_icons合并到items中，标记icon_type="custom"
+        4. 将custom_icons合并到items中（不再设置icon_type）
         5. 统一frame字段名（支持icon_frame和frame）
+        6. 移除旧版的icon_type字段
         """
         if config.get("_migrated"):
             return config
@@ -2168,7 +2169,7 @@ class SuitLoader:
             print(f"[INFO] 正在迁移配置到新版格式...")
             migrated_count = 0
 
-            # 1. 迁移items，处理无图标状态
+            # 1. 迁移items，处理无图标状态和移除icon_type
             for part in self.PART_ORDER:
                 part_items = config.get("items", {}).get(part, {})
                 for code, item in list(part_items.items()):
@@ -2187,8 +2188,8 @@ class SuitLoader:
                             item["frame"] = -1
                             migrated_count += 1
 
-                        # 如果frame为-1，删除icon_type（表示无图标）
-                        if item.get("frame") == -1 and "icon_type" in item:
+                        # 移除icon_type字段（新版不再需要）
+                        if "icon_type" in item:
                             del item["icon_type"]
                             migrated_count += 1
                     else:
@@ -2197,24 +2198,23 @@ class SuitLoader:
                             "name": str(item),
                             "frame": -1,  # -1表示无图标
                             "hide_parts": [],
-                            # 不设置icon_type，表示无图标
                         }
                         migrated_count += 1
 
-            # 2. 将custom_icons合并到items
+            # 2. 将custom_icons合并到items（新版不再设置icon_type）
             if "custom_icons" in config:
                 for part, icons in config["custom_icons"].items():
                     for code, icon_config in icons.items():
                         # 获取现有item或创建新的
                         existing = config["items"].get(part, {}).get(code, {})
-                        # 只有当有有效frame时才设置icon_type
+                        # 判断是否有有效frame
                         frame = icon_config.get("frame", 0)
                         if frame >= 0:
+                            # 自定义图标：只保存frame和img，不设置icon_type
                             config["items"].setdefault(part, {})[code] = {
                                 "name": existing.get("name", f"时装{code}"),
                                 "frame": frame,
                                 "img": icon_config.get("img"),
-                                "icon_type": "custom",
                                 "hide_parts": existing.get("hide_parts") or [],
                             }
                         else:
@@ -2224,12 +2224,14 @@ class SuitLoader:
                                 "frame": -1,
                                 "hide_parts": existing.get("hide_parts") or [],
                             }
+                        migrated_count += 1
                 # 删除旧的custom_icons字段
                 del config["custom_icons"]
                 print(f"[INFO] 已迁移旧版custom_icons到统一items格式")
 
-            # 标记已迁移
+            # 标记已迁移（使用新版本号）
             config["_migrated"] = True
+            config["_version"] = "2.0"  # 新增版本号标记
 
             # 保存迁移后的配置
             if job_key:
@@ -2274,7 +2276,7 @@ class SuitLoader:
             return False
 
     def load_suits_for_job(self, job_key: str) -> bool:
-        """加载指定职业的套装数据（使用统一items格式）"""
+        """加载指定职业的套装数据（优化版：通过img字段判断自定义图标）"""
         self.suits[job_key] = []
         self.item_names[job_key] = {}
         self.icon_frames[job_key] = {part: {} for part in self.PART_ORDER}
@@ -2288,7 +2290,7 @@ class SuitLoader:
             # 加载套装
             self.suits[job_key] = config.get("suits", [])
 
-            # 加载物品信息（统一格式）
+            # 加载物品信息（优化版格式）
             items = config.get("items", {})
             for part in self.PART_ORDER:
                 self.item_names[job_key][part] = {}
@@ -2298,30 +2300,26 @@ class SuitLoader:
                         # 1. 名称总是读取
                         self.item_names[job_key][part][code] = info.get("name", "")
 
-                        # 2. 判断是否真的有图标
-                        icon_type = info.get("icon_type")
+                        # 2. 判断是否真的有图标（新版：只检查frame字段）
                         frame = info.get("frame")
+                        img = info.get("img")
 
-                        # 有图标的条件：有icon_type 且 frame不为None且不为-1
-                        has_icon = (
-                            icon_type is not None  # 有icon_type字段
-                            and frame is not None  # 有frame字段
-                            and frame != -1  # frame不是-1
-                        )
+                        # 有图标的条件：frame不为None且不为-1
+                        has_icon = frame is not None and frame != -1
 
                         if has_icon:
-                            if icon_type == "custom":
-                                # 自定义图标
+                            if img is not None:
+                                # 有img字段 -> 自定义图标
                                 if job_key not in self.custom_icons:
                                     self.custom_icons[job_key] = {}
                                 if part not in self.custom_icons[job_key]:
                                     self.custom_icons[job_key][part] = {}
                                 self.custom_icons[job_key][part][code] = {
-                                    "img": info.get("img"),
+                                    "img": img,
                                     "frame": frame,
                                 }
                             else:
-                                # 标准图标
+                                # 无img字段 -> 标准图标
                                 self.icon_frames[job_key][part][code] = frame
                         # else: 无图标，不加入icon_frames和custom_icons
                     else:
@@ -2362,7 +2360,7 @@ class SuitLoader:
         return self.custom_icons.get(job_key, {}).get(part, {}).get(code)
 
     def add_custom_icon(self, job_key: str, part: str, code: str, img: str, frame: int):
-        """添加自定义图标配置（使用统一items格式）"""
+        """添加自定义图标配置（优化版：不再设置icon_type字段）"""
         # 更新内存缓存（保持兼容性）
         if job_key not in self.custom_icons:
             self.custom_icons[job_key] = {}
@@ -2371,7 +2369,7 @@ class SuitLoader:
 
         self.custom_icons[job_key][part][code] = {"img": img, "frame": frame}
 
-        # 更新配置并保存（使用统一items格式）
+        # 更新配置并保存（优化版：通过img字段标识自定义图标）
         config = self._load_or_convert_config(job_key)
         if config:
             # 保留现有item的配置（如hide_parts）
@@ -2382,12 +2380,11 @@ class SuitLoader:
                 hide_parts = []
             name = existing.get("name", f"时装{code}")
 
-            # 更新为统一格式
+            # 更新为优化格式：有img字段表示自定义图标，不再设置icon_type
             config["items"].setdefault(part, {})[code] = {
                 "name": name,
                 "frame": frame,
                 "img": img,
-                "icon_type": "custom",
                 "hide_parts": hide_parts,
             }
             self._save_config(job_key, config)
@@ -2591,10 +2588,9 @@ class SuitLoader:
         return self.item_names.get(job_key, {}).get(part, {}).get(code)
 
     def get_icon_frame(self, job_key: str, part: str, code: str) -> Optional[int]:
-        """获取图标帧号 - 无图标时返回None
+        """获取图标帧号 - 无图标时返回None（优化版：通过frame字段判断）
 
         无图标的条件：
-        - 没有icon_type字段
         - frame为None
         - frame为-1
         """
@@ -2603,11 +2599,10 @@ class SuitLoader:
         if config:
             item = config.get("items", {}).get(part, {}).get(code)
             if isinstance(item, dict):
-                icon_type = item.get("icon_type")
                 frame = item.get("frame")
 
-                # 无图标的条件
-                if icon_type is None or frame is None or frame == -1:
+                # 无图标的条件：frame为None 或 frame为-1
+                if frame is None or frame == -1:
                     return None
 
                 # 有图标，返回frame
@@ -2629,25 +2624,27 @@ class SuitLoader:
     def get_icon_source(
         self, job_key: str, part: str, code: str
     ) -> Tuple[str, Optional[int]]:
-        """获取图标来源信息
+        """获取图标来源信息（优化版：通过img字段判断自定义图标）
         返回: ("standard", frame) 或 ("custom", frame) 或 ("none", None)
 
-        注意：当没有icon_type或frame为-1时，返回("none", None)表示无图标
+        注意：当frame为None或-1时，返回("none", None)表示无图标
+              当存在img字段时，返回("custom", frame)表示自定义图标
+              否则返回("standard", frame)表示标准图标
         """
-        # 先检查完整配置，确认是否有icon_type
+        # 先检查完整配置
         config = self._load_or_convert_config(job_key)
         if config:
             item = config.get("items", {}).get(part, {}).get(code)
             if isinstance(item, dict):
-                icon_type = item.get("icon_type")
                 frame = item.get("frame")
+                img = item.get("img")
 
-                # 无图标的条件：没有icon_type 或 frame为None 或 frame为-1
-                if icon_type is None or frame is None or frame == -1:
+                # 无图标的条件：frame为None 或 frame为-1
+                if frame is None or frame == -1:
                     return ("none", None)
 
-                # 有图标
-                if icon_type == "custom":
+                # 有图标：通过img字段判断是否为自定义图标
+                if img is not None:
                     return ("custom", frame)
                 else:
                     return ("standard", frame)
@@ -2707,7 +2704,7 @@ class SuitLoader:
         name: str,
         hide_parts: Optional[List[str]] = None,
     ) -> bool:
-        """添加或更新时装信息到JSON配置（支持隐藏部位）
+        """添加或更新时装信息到JSON配置（优化版：移除icon_type字段）
 
         Args:
             icon_marker: 图标标识（如"头饰2"），为空或无效时表示无图标
@@ -2732,7 +2729,7 @@ class SuitLoader:
             if part not in config["items"]:
                 config["items"][part] = {}
 
-            # 保留现有配置（如hide_parts）
+            # 保留现有配置（如hide_parts、img等）
             existing = config["items"][part].get(code, {})
             if hide_parts is not None:
                 existing_hide_parts = hide_parts
@@ -2742,20 +2739,22 @@ class SuitLoader:
                 if not isinstance(existing_hide_parts, list):
                     existing_hide_parts = []
 
-            # 构建保存的数据
+            # 构建保存的数据（优化版：不再设置icon_type）
             item_data = {
                 "name": name,
                 "hide_parts": existing_hide_parts,
             }
 
             if has_icon:
-                # 有图标时添加图标相关字段
-                item_data["icon_type"] = "standard"
+                # 有图标时：只设置frame（存在frame表示标准IMG）
                 item_data["frame"] = frame
+                # 移除可能存在的旧img字段（如果从自定义切换到标准）
+                if "img" in existing:
+                    # 不继承旧的img字段
+                    pass
             else:
-                # 无图标时：不设置icon_type，frame设为-1
+                # 无图标时：frame设为-1
                 item_data["frame"] = -1
-                # 不添加icon_type字段
 
             # 更新或添加物品信息
             config["items"][part][code] = item_data
@@ -2771,12 +2770,15 @@ class SuitLoader:
                 self.icon_frames.setdefault(job_key, {}).setdefault(part, {})[
                     code
                 ] = frame
+                # 从custom_icons中移除（如果从自定义切换到标准）
+                if job_key in self.custom_icons and part in self.custom_icons.get(job_key, {}):
+                    self.custom_icons[job_key][part].pop(code, None)
             else:
-                # 无图标时，从icon_frames中移除（如果存在）
-                if job_key in self.icon_frames and part in self.icon_frames.get(
-                    job_key, {}
-                ):
+                # 无图标时，从icon_frames和custom_icons中移除
+                if job_key in self.icon_frames and part in self.icon_frames.get(job_key, {}):
                     self.icon_frames[job_key][part].pop(code, None)
+                if job_key in self.custom_icons and part in self.custom_icons.get(job_key, {}):
+                    self.custom_icons[job_key][part].pop(code, None)
 
             print(
                 f"[DEBUG] 已保存到JSON: {job_key}/{part}/{code} -> 帧号={frame if has_icon else '无图标'}, 名称={name}"
@@ -2797,7 +2799,7 @@ class SuitLoader:
         name: str,
         hide_parts: Optional[List[str]] = None,
     ) -> bool:
-        """保存时装信息（无图标）
+        """保存时装信息（无图标）（优化版）
 
         Args:
             hide_parts: 要隐藏的部位列表，默认为空列表
@@ -2823,12 +2825,11 @@ class SuitLoader:
             if not isinstance(hide_parts, list):
                 hide_parts = []
 
-            # 构建无图标的数据
+            # 构建无图标的数据（优化版：frame=-1表示无图标，不设置icon_type）
             item_data = {
                 "name": name,
                 "frame": -1,  # -1表示无图标
                 "hide_parts": hide_parts,
-                # 不设置icon_type，表示无图标
             }
 
             # 更新或添加物品信息
@@ -7220,33 +7221,29 @@ class DressingRoomApp:
             if not item_config:
                 return
 
-            icon_type = item_config.get("icon_type")
             frame = item_config.get("frame")
+            img = item_config.get("img")
 
-            # 检查是否有效图标
-            if icon_type is None or frame is None or frame == -1:
+            # 检查是否有效图标（优化版：只检查frame字段）
+            if frame is None or frame == -1:
                 return
 
             pil_img = None
 
-            # 根据图标类型加载
-            if icon_type == "standard":
+            # 根据img字段判断图标类型（优化版）
+            if img is None:
+                # 无img字段 -> 标准图标
                 npk_name = self.suit_loader.get_icon_npk_name(job_key)
                 img_name = self.suit_loader.get_icon_img_name(job_key, part)
                 if npk_name and img_name:
                     pil_img = self.icon_loader.get_icon(
                         npk_name, img_name, frame, size=(32, 32)
                     )
-            elif icon_type == "custom":
-                # 自定义图标从配置中获取img路径
-                custom_config = self.suit_loader.get_custom_icon(job_key, part, display_code)
-                if custom_config:
-                    img_path = custom_config.get("img")
-                    custom_frame = custom_config.get("frame", 0)
-                    if img_path:
-                        pil_img = self.icon_loader.get_icon_by_img_path(
-                            img_path, custom_frame, size=(32, 32)
-                        )
+            else:
+                # 有img字段 -> 自定义图标
+                pil_img = self.icon_loader.get_icon_by_img_path(
+                    img, frame, size=(32, 32)
+                )
 
             # 显示图标
             if pil_img:
@@ -7337,13 +7334,9 @@ class DressingRoomApp:
                         )
                         has_icon = False
                         if item_config:
-                            icon_type = item_config.get("icon_type")
                             frame = item_config.get("frame")
-                            has_icon = (
-                                icon_type is not None
-                                and frame is not None
-                                and frame != -1
-                            )
+                            # 优化版：只检查frame字段判断是否有图标
+                            has_icon = frame is not None and frame != -1
 
                         if item_config and not has_icon:
                             # 状态：有配置但无图标
@@ -9722,16 +9715,17 @@ class AssignIconDialog:
                 self.job_key, self.part, code
             )
             
-            if item_config and item_config.get("icon_type") is not None:
+            # 检查该时装是否已有图标配置（优化版：通过frame字段判断）
+            has_icon = item_config and item_config.get("frame") is not None and item_config.get("frame") != -1
+            
+            if has_icon:
                 # 有图标：保留原有图标配置，只更新名称和隐藏部位
-                icon_type = item_config.get("icon_type")
                 frame = item_config.get("frame")
                 img = item_config.get("img")
                 
-                # 构建保留图标的数据
+                # 构建保留图标的数据（优化版：不再设置icon_type）
                 updated_config = {
                     "name": new_name,
-                    "icon_type": icon_type,
                     "frame": frame,
                     "hide_parts": hide_parts,
                 }
@@ -10073,9 +10067,9 @@ class AssignIconDialog:
         # 检查是否有图标
         has_icon = False
         if item_config:
-            icon_type = item_config.get("icon_type")
             frame = item_config.get("frame")
-            has_icon = icon_type is not None and frame is not None and frame != -1
+            # 优化版：只通过frame字段判断是否有图标
+            has_icon = frame is not None and frame != -1
 
         if not has_icon:
             messagebox.showinfo("提示", "该时装当前没有图标配置", parent=self.dialog)
@@ -10194,24 +10188,29 @@ class AssignIconDialog:
         self._load_existing_icon_selection()
 
     def _load_existing_icon_selection(self):
-        """加载当前时装已有的图标选择"""
+        """加载当前时装已有的图标选择（优化版）"""
         # 获取当前时装的图标配置
         item_config = self.app.suit_loader.get_item_config(
             self.job_key, self.part, self.equip_code
         )
 
         if item_config:
-            icon_type = item_config.get("icon_type")
             frame = item_config.get("frame")
+            img = item_config.get("img")
 
-            # 只有当有icon_type且frame有效时才设置
-            if icon_type == "standard" and frame is not None and frame >= 0:
+            # 优化版：通过img字段判断是否为标准图标
+            if img is None and frame is not None and frame >= 0:
+                # 无img字段且有有效frame -> 标准图标
                 self.selected_frame = frame
                 self.selected_frame_var.set(f"已选择图标帧: {frame}")
-            elif icon_type is None or frame is None or frame == -1:
+            elif frame is None or frame == -1:
                 # 无图标
                 self.selected_frame = None
                 self.selected_frame_var.set("未选择图标（无图标）")
+            else:
+                # 有img字段 -> 自定义图标，在标准图标页显示为无图标
+                self.selected_frame = None
+                self.selected_frame_var.set("当前为自定义图标")
         else:
             # 无配置
             self.selected_frame = None
