@@ -1517,13 +1517,13 @@ def main():
     # 根据命令行参数覆盖 config 配置
     write_local = default_write_local
     if args.local:
-        write_local = True
+        write_local = False
     elif args.no_local:
         write_local = False
     
     upload_pvf = default_upload_pvf
     if args.upload:
-        upload_pvf = True
+        upload_pvf = False
     elif args.no_upload:
         upload_pvf = False
     

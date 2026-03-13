@@ -235,7 +235,7 @@ class AvatarDataExtractor:
 
 def main():
     """主入口 - 从 NPK 提取 Avatar 数据"""
-    extractor = AvatarDataExtractor(Path(r'D:\DOF\NPK'))
+    extractor = AvatarDataExtractor(Path(r'D:\DOF\output\Download\中国大陆-魔界'))
     try:
         output_path = extractor.save_to_json()
         print(f"\n成功！输出文件: {output_path}")

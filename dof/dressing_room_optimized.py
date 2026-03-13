@@ -1384,6 +1384,41 @@ def blend_layer_with_opacity(
     return Image.fromarray(result_arr)
 
 
+def adjust_layer_opacity(img: Image.Image, opacity_pct: int = 0) -> Image.Image:
+    """
+    调整图层整体透明度
+    
+    将 -100~100 的透明度百分比转换为 alpha 乘数，整体调整图层透明度
+    -100% -> 完全透明 (alpha = 0)
+    0% -> 原样 (alpha 不变)
+    +100% -> 不支持（保持原样）
+    
+    Args:
+        img: 输入图像
+        opacity_pct: 透明度调整值 (-100 ~ 100)
+        
+    Returns:
+        调整透明度后的图像
+    """
+    # 转换为 alpha 乘数: -100% -> 0.0, 0% -> 1.0
+    opacity = (opacity_pct + 100) / 100.0
+    opacity = np.clip(opacity, 0.0, 1.0)
+    
+    if opacity >= 0.99:
+        # 近乎不变，直接返回原图
+        return img.copy()
+    
+    # 转换为 numpy 数组
+    img_arr = np.array(img.convert("RGBA"), dtype=np.float32)
+    
+    # 调整 alpha 通道
+    img_arr[:, :, 3] = img_arr[:, :, 3] * opacity
+    
+    # 转回 uint8
+    result_arr = np.clip(img_arr, 0, 255).astype(np.uint8)
+    return Image.fromarray(result_arr)
+
+
 def get_layer_priority(part: str, layer: str) -> int:
     """获取图层优先级，值越小越在下层
 
@@ -7477,21 +7512,27 @@ class DressingRoomApp:
         hidden_parts = self._get_hidden_parts()
 
         # 收集所有需要绘制的图层
+        # 所有图层统一按照 LAYER_DICT 定义的优先级排序绘制（值越大越在上层）
+        # 使用固定的 LAYER_ORDER 遍历顺序，确保无论选择顺序如何，图层顺序都一致
         render_items = []
-        for part, option_idx in self.selected_parts.items():
+        for part in LAYER_ORDER:
+            if part not in self.selected_parts:
+                continue
             # 跳过被隐藏的部位
             if part in hidden_parts:
                 continue
 
+            option_idx = self.selected_parts[part]
             layer_count, layer_names = self.loader.get_sprite_layer_info(
                 part, option_idx
             )
             for layer in layer_names:
-                priority = LAYER_DICT.get(
-                    f"{part}_{layer}", 0 if part == "skin" else 3000
-                )
+                # 从 LAYER_DICT 获取优先级，skin 默认 0（最底层），其他默认 3000
+                layer_key = f"{part}_{layer}"
+                priority = LAYER_DICT.get(layer_key, 0 if part == "skin" else 3000)
                 render_items.append((part, option_idx, layer, priority))
 
+        # 按优先级排序（值小的先绘制，值大的后绘制）
         render_items.sort(key=lambda x: x[3])
 
         # 图层处理调试计数
@@ -7507,93 +7548,76 @@ class DressingRoomApp:
         #     layer_names = [layer for _, _, layer, _ in render_items]
         #     print(f"[Debug] Render layers: {layer_names}")
 
+        # 按照 LAYER_DICT 顺序一层一层绘制到 500x500 帧域画布
         for part, option_idx, layer, _ in render_items:
             layer_img = self.loader.get_layer_sprite(
                 part, option_idx, layer, self.current_frame
             )
-            if layer_img:
-                # 检查是否为f层并处理
-                if self.process_f_layers and is_f_layer(layer):
-                    f_layer_count += 1
-                    # 使用缓存键
-                    cache_key = (part, option_idx, layer, self.current_frame)
+            if not layer_img:
+                continue
 
-                    # 检查f层缓存
-                    if cache_key in self.cache.f_layer:
-                        processed_img = self.cache.f_layer[cache_key]
-                        frame_canvas.paste(processed_img, (0, 0), processed_img)
-                    else:
-                        # 缓存未命中，进行f层处理（单独去黑底）
-                        processed = apply_f_layer_process(layer_img, black_threshold=50)
+            # 缓存键
+            cache_key = (part, option_idx, layer, self.current_frame)
 
-                        # 存入f层缓存
-                        if len(self.cache.f_layer) >= self.cache.f_layer.max_size:
-                            keys_to_remove = list(self.cache.f_layer.keys())[
-                                : self.cache.f_layer.max_size // 10
-                            ]
-                            for key in keys_to_remove:
-                                del self.cache.f_layer[key]
-
-                        self.cache.f_layer[cache_key] = processed
-                        frame_canvas.paste(processed, (0, 0), processed)
-                    f_layer_processed += 1
-                elif self.process_g_layers and is_g_layer(layer):
-                    g_layer_count += 1
-                    # g层: 半透明混合（类似f层处理方式）
-                    cache_key = (part, option_idx, layer, self.current_frame)
-
-                    if cache_key in self.cache.g_layer:
-                        processed_img = self.cache.g_layer[cache_key]
-                        frame_canvas.paste(processed_img, (0, 0), processed_img)
-                    else:
-                        # 裁剪base区域进行不透明度混合
-                        crop_box = (0, 0, layer_img.width, layer_img.height)
-                        base_region = frame_canvas.crop(crop_box)
-                        blended = blend_layer_with_opacity(
-                            base_region, layer_img, opacity_pct=self.g_layer_opacity
-                        )
-
-                        # 存入g层缓存
-                        if len(self.cache.g_layer) >= self.cache.g_layer.max_size:
-                            keys_to_remove = list(self.cache.g_layer.keys())[
-                                : self.cache.g_layer.max_size // 10
-                            ]
-                            for key in keys_to_remove:
-                                del self.cache.g_layer[key]
-
-                        self.cache.g_layer[cache_key] = blended
-                        frame_canvas.paste(blended, (0, 0), blended)
-                    g_layer_processed += 1
-                elif self.process_h_layers and is_h_layer(layer):
-                    h_layer_count += 1
-                    # h层: 半透明混合（类似f层处理方式）
-                    cache_key = (part, option_idx, layer, self.current_frame)
-
-                    if cache_key in self.cache.h_layer:
-                        processed_img = self.cache.h_layer[cache_key]
-                        frame_canvas.paste(processed_img, (0, 0), processed_img)
-                    else:
-                        # 裁剪base区域进行不透明度混合
-                        crop_box = (0, 0, layer_img.width, layer_img.height)
-                        base_region = frame_canvas.crop(crop_box)
-                        blended = blend_layer_with_opacity(
-                            base_region, layer_img, opacity_pct=self.h_layer_opacity
-                        )
-
-                        # 存入h层缓存
-                        if len(self.cache.h_layer) >= self.cache.h_layer.max_size:
-                            keys_to_remove = list(self.cache.h_layer.keys())[
-                                : self.cache.h_layer.max_size // 10
-                            ]
-                            for key in keys_to_remove:
-                                del self.cache.h_layer[key]
-
-                        self.cache.h_layer[cache_key] = blended
-                        frame_canvas.paste(blended, (0, 0), blended)
-                    h_layer_processed += 1
+            # f层: 发光层 - 需要去黑底处理
+            if self.process_f_layers and is_f_layer(layer):
+                f_layer_count += 1
+                if cache_key in self.cache.f_layer:
+                    processed_img = self.cache.f_layer[cache_key]
                 else:
-                    # 普通层: 直接粘贴
-                    frame_canvas.paste(layer_img, (0, 0), layer_img)
+                    processed_img = apply_f_layer_process(layer_img, black_threshold=50)
+                    # 存入缓存
+                    if len(self.cache.f_layer) >= self.cache.f_layer.max_size:
+                        keys_to_remove = list(self.cache.f_layer.keys())[
+                            : self.cache.f_layer.max_size // 10
+                        ]
+                        for key in keys_to_remove:
+                            del self.cache.f_layer[key]
+                    self.cache.f_layer[cache_key] = processed_img
+                frame_canvas.paste(processed_img, (0, 0), processed_img)
+                f_layer_processed += 1
+
+            # g层: 半透明阴影层 - 调整整体透明度
+            elif self.process_g_layers and is_g_layer(layer):
+                g_layer_count += 1
+                if cache_key in self.cache.g_layer:
+                    processed_img = self.cache.g_layer[cache_key]
+                else:
+                    # 将图层整体调整为指定透明度，然后粘贴
+                    processed_img = adjust_layer_opacity(layer_img, self.g_layer_opacity)
+                    # 存入缓存
+                    if len(self.cache.g_layer) >= self.cache.g_layer.max_size:
+                        keys_to_remove = list(self.cache.g_layer.keys())[
+                            : self.cache.g_layer.max_size // 10
+                        ]
+                        for key in keys_to_remove:
+                            del self.cache.g_layer[key]
+                    self.cache.g_layer[cache_key] = processed_img
+                frame_canvas.paste(processed_img, (0, 0), processed_img)
+                g_layer_processed += 1
+
+            # h层: 深层阴影层 - 调整整体透明度
+            elif self.process_h_layers and is_h_layer(layer):
+                h_layer_count += 1
+                if cache_key in self.cache.h_layer:
+                    processed_img = self.cache.h_layer[cache_key]
+                else:
+                    # 将图层整体调整为指定透明度，然后粘贴
+                    processed_img = adjust_layer_opacity(layer_img, self.h_layer_opacity)
+                    # 存入缓存
+                    if len(self.cache.h_layer) >= self.cache.h_layer.max_size:
+                        keys_to_remove = list(self.cache.h_layer.keys())[
+                            : self.cache.h_layer.max_size // 10
+                        ]
+                        for key in keys_to_remove:
+                            del self.cache.h_layer[key]
+                    self.cache.h_layer[cache_key] = processed_img
+                frame_canvas.paste(processed_img, (0, 0), processed_img)
+                h_layer_processed += 1
+
+            # 普通层: 直接粘贴
+            else:
+                frame_canvas.paste(layer_img, (0, 0), layer_img)
 
         bbox = frame_canvas.getbbox()
         if bbox:
@@ -7669,58 +7693,39 @@ class DressingRoomApp:
 
                         self.cache.f_layer[cache_key] = processed
                         frame_canvas.paste(processed, (0, 0), processed)
+                # g层: 半透明阴影层 - 调整整体透明度
                 elif self.process_g_layers and is_g_layer(layer):
-                    # g层处理（使用缓存）
                     cache_key = (part, option_idx, layer, frame_idx)
-
                     if cache_key in self.cache.g_layer:
                         processed_img = self.cache.g_layer[cache_key]
-                        frame_canvas.paste(processed_img, (0, 0), processed_img)
                     else:
-                        # 裁剪base区域进行不透明度混合
-                        crop_box = (0, 0, layer_img.width, layer_img.height)
-                        base_region = frame_canvas.crop(crop_box)
-                        blended = blend_layer_with_opacity(
-                            base_region, layer_img, opacity_pct=self.g_layer_opacity
-                        )
-
-                        # 存入g层缓存
+                        processed_img = adjust_layer_opacity(layer_img, self.g_layer_opacity)
                         if len(self.cache.g_layer) >= self.cache.g_layer.max_size:
                             keys_to_remove = list(self.cache.g_layer.keys())[
                                 : self.cache.g_layer.max_size // 10
                             ]
                             for key in keys_to_remove:
                                 del self.cache.g_layer[key]
+                        self.cache.g_layer[cache_key] = processed_img
+                    frame_canvas.paste(processed_img, (0, 0), processed_img)
 
-                        self.cache.g_layer[cache_key] = blended
-                        frame_canvas.paste(blended, (0, 0), blended)
+                # h层: 深层阴影层 - 调整整体透明度
                 elif self.process_h_layers and is_h_layer(layer):
-                    # h层处理（使用缓存）
                     cache_key = (part, option_idx, layer, frame_idx)
-
                     if cache_key in self.cache.h_layer:
                         processed_img = self.cache.h_layer[cache_key]
-                        frame_canvas.paste(processed_img, (0, 0), processed_img)
                     else:
-                        # 裁剪base区域进行不透明度混合
-                        crop_box = (0, 0, layer_img.width, layer_img.height)
-                        base_region = frame_canvas.crop(crop_box)
-                        blended = blend_layer_with_opacity(
-                            base_region, layer_img, opacity_pct=self.h_layer_opacity
-                        )
-
-                        # 存入h层缓存
+                        processed_img = adjust_layer_opacity(layer_img, self.h_layer_opacity)
                         if len(self.cache.h_layer) >= self.cache.h_layer.max_size:
-                            keys_to_remove = list(
-                                self.cache.h_layer.keys()[
-                                    : self.cache.h_layer.max_size // 10
-                                ]
-                            )
+                            keys_to_remove = list(self.cache.h_layer.keys())[
+                                : self.cache.h_layer.max_size // 10
+                            ]
                             for key in keys_to_remove:
                                 del self.cache.h_layer[key]
+                        self.cache.h_layer[cache_key] = processed_img
+                    frame_canvas.paste(processed_img, (0, 0), processed_img)
 
-                        self.cache.h_layer[cache_key] = blended
-                        frame_canvas.paste(blended, (0, 0), blended)
+                # 普通层: 直接粘贴
                 else:
                     frame_canvas.paste(layer_img, (0, 0), layer_img)
 
@@ -7771,19 +7776,24 @@ class DressingRoomApp:
                 return
 
             # 获取渲染项列表（与_update_preview一致）- 支持隐藏部位
+            # 所有图层统一按照 LAYER_DICT 定义的优先级排序绘制（值越大越在上层）
+            # 使用固定的 LAYER_ORDER 遍历顺序，确保无论选择顺序如何，图层顺序都一致
             hidden_parts = self._get_hidden_parts()
             render_items = []
-            for part, option_idx in self.selected_parts.items():
+            for part in LAYER_ORDER:
+                if part not in self.selected_parts:
+                    continue
                 # 跳过被隐藏的部位
                 if part in hidden_parts:
                     continue
+                option_idx = self.selected_parts[part]
                 layer_count, layer_names = self.loader.get_sprite_layer_info(
                     part, option_idx
                 )
                 for layer in layer_names:
-                    priority = LAYER_DICT.get(
-                        f"{part}_{layer}", 0 if part == "skin" else 3000
-                    )
+                    # 从 LAYER_DICT 获取优先级，skin 默认 0（最底层），其他默认 3000
+                    layer_key = f"{part}_{layer}"
+                    priority = LAYER_DICT.get(layer_key, 0 if part == "skin" else 3000)
                     render_items.append((part, option_idx, layer, priority))
             render_items.sort(key=lambda x: x[3])
 
@@ -8085,44 +8095,55 @@ class DressingRoomApp:
             hidden_parts = self._get_hidden_parts()
             
             # 收集所有需要绘制的图层
+            # 所有图层统一按照 LAYER_DICT 定义的优先级排序绘制（值越大越在上层）
+            # 使用固定的 LAYER_ORDER 遍历顺序，确保无论选择顺序如何，图层顺序都一致
             render_items = []
-            for part, option_idx in self.selected_parts.items():
+            for part in LAYER_ORDER:
+                if part not in self.selected_parts:
+                    continue
                 # 跳过被隐藏的部位
                 if part in hidden_parts:
                     continue
                 
+                option_idx = self.selected_parts[part]
                 layer_count, layer_names = self.loader.get_sprite_layer_info(
                     part, option_idx
                 )
                 for layer in layer_names:
-                    priority = LAYER_DICT.get(
-                        f"{part}_{layer}", 0 if part == "skin" else 3000
-                    )
+                    # 从 LAYER_DICT 获取优先级，skin 默认 0（最底层），其他默认 3000
+                    layer_key = f"{part}_{layer}"
+                    priority = LAYER_DICT.get(layer_key, 0 if part == "skin" else 3000)
                     render_items.append((part, option_idx, layer, priority))
             
-            # 按优先级排序
+            # 按优先级排序（值小的先绘制，值大的后绘制）
             render_items.sort(key=lambda x: x[3])
             
-            # 渲染所有图层
+            # 按照 LAYER_DICT 顺序一层一层绘制到 500x500 帧域画布
             for part, option_idx, layer, _ in render_items:
                 layer_img = self.loader.get_layer_sprite(
                     part, option_idx, layer, frame_num
                 )
-                if layer_img:
-                    # 处理f-layer（发光层）
-                    if self.process_f_layers and is_f_layer(layer):
-                        processed = apply_f_layer_process(layer_img, black_threshold=50)
-                        frame_canvas.paste(processed, (0, 0), processed)
-                    # 处理g-layer（半透明层）
-                    elif self.process_g_layers and is_g_layer(layer):
-                        crop_box = (0, 0, layer_img.width, layer_img.height)
-                        base_region = frame_canvas.crop(crop_box)
-                        blended = blend_layer_with_opacity(
-                            base_region, layer_img, opacity_pct=self.g_layer_opacity
-                        )
-                        frame_canvas.paste(blended, (0, 0), blended)
-                    else:
-                        frame_canvas.paste(layer_img, (0, 0), layer_img)
+                if not layer_img:
+                    continue
+
+                # f层: 发光层 - 去黑底处理
+                if self.process_f_layers and is_f_layer(layer):
+                    processed = apply_f_layer_process(layer_img, black_threshold=50)
+                    frame_canvas.paste(processed, (0, 0), processed)
+
+                # g层: 半透明阴影层 - 调整整体透明度
+                elif self.process_g_layers and is_g_layer(layer):
+                    processed = adjust_layer_opacity(layer_img, self.g_layer_opacity)
+                    frame_canvas.paste(processed, (0, 0), processed)
+
+                # h层: 深层阴影层 - 调整整体透明度
+                elif self.process_h_layers and is_h_layer(layer):
+                    processed = adjust_layer_opacity(layer_img, self.h_layer_opacity)
+                    frame_canvas.paste(processed, (0, 0), processed)
+
+                # 普通层: 直接粘贴
+                else:
+                    frame_canvas.paste(layer_img, (0, 0), layer_img)
             
             # 裁剪有效区域（先裁剪动画内容）
             bbox = frame_canvas.getbbox()

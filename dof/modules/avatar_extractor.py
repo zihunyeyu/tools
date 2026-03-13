@@ -82,7 +82,7 @@ class AvatarExtractor:
     
     # Avatar 路径过滤关键字
     AVATAR_KEYWORDS = ['/avatar/', '/at_avatar/', ]  # 包含 avatar 但不包含 aura 的路径
-    EXCLUDE_KEYWORDS = ['/aura/']
+    EXCLUDE_KEYWORDS = ['/aura/', '/weapon/']
     
     def __init__(
         self,
