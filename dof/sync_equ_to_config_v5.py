@@ -1,14 +1,23 @@
 """
-从 PVF equ 文件同步数据到 avatar_config.json
+从 PVF equ 文件同步数据到 avatar_config.json (v5 - 图标对比匹配)
 
 功能：
 1. 从 PVF 读取时装 equ 文件
-2. 筛选 name 不是"英文+数字"组合的文件
-3. 提取 name、icon frame、hide parts 信息
+2. 对于非标准路径的 icon，使用像素级对比找到标准 NPK 中的对应帧
+3. 提取 name、hide parts 信息
 4. 自动备份并更新 avatar_config.json
 
-用法：
-    python sync_equ_to_config.py [--config PATH] [--backup-dir PATH] [--dry-run]
+标准NPK路径示例:
+    E:\\DOF\\Tools\\blackcat.6.12\\output\\Download\\中国大陆-魔界
+
+PVF NPK路径示例:
+    D:\\BaiduNetdiskDownload\\ImagePacks2
+
+用法:
+    python sync_equ_to_config_v5.py 
+        --standard-npk-dir "E:\\...\\中国大陆-魔界"
+        --pvf-npk-dir "D:\\...\\ImagePacks2"
+        [--config PATH] [--backup-dir PATH] [--dry-run]
 """
 
 import json
@@ -16,7 +25,7 @@ import re
 import shutil
 import logging
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List, Set
+from typing import Dict, Optional, Tuple, List
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -24,7 +33,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).parent))
 
 from modules.avatar_extractor import AvatarExtractor
-from config import PVF_API_HOST, PVF_API_PORT
+from modules.icon_matcher import IconMatcher
+from config import PVF_API_HOST, PVF_API_PORT, STANDARD_NPK_DIR, PVF_NPK_DIR
 
 # 配置日志
 logging.basicConfig(
@@ -73,43 +83,27 @@ EQU_TYPE_TO_PART = {
     '[skin avatar]': 'skin',
 }
 
+# 标准职业目录白名单（小写）
+VALID_JOB_FOLDERS = {
+    'swordman', 'fighter', 'atfighter', 'gunner', 'atgunner',
+    'mage', 'atmage', 'priest', 'thief'
+}
 
-@dataclass
-class EquInfo:
-    """从 equ 文件提取的信息"""
-    code: str
-    path: str
-    career: str
-    part: str
-    name: str
-    frame: int
-    variation: Tuple[int, int]  # (variation_code, suffix)
-    hide_parts: List[str]
+
+# 严格的路径格式验证正则表达式
+# 格式: item/avatar/{职业目录}/{前缀}_a{部位}.img
+STRICT_ICON_PATH_PATTERN = re.compile(
+    r'^item/avatar/([a-zA-Z]+)/[a-zA-Z]+_a(?:cap|coat|hair|face|neck|pants|belt|shoes|skin|body)\.img$',
+    re.IGNORECASE
+)
 
 
 def is_english_number_only(name: str) -> bool:
-    """
-    检查 name 是否仅为英文+数字组合
-    
-    返回 True 如果：
-    - 纯英文+数字（如 cap123, hat456）
-    - 空字符串
-    
-    返回 False 如果：
-    - 包含中文
-    - 包含空格
-    - 包含特殊字符
-    """
+    """检查 name 是否仅为英文+数字组合"""
     if not name or not name.strip():
         return True
-    
     name = name.strip()
-    # 只允许英文字母、数字、下划线
     pattern = r'^[a-zA-Z_][a-zA-Z0-9_]*$'
-    
-    if name == '':
-        return True
-    
     return bool(re.match(pattern, name))
 
 
@@ -119,21 +113,34 @@ def extract_name(content: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def extract_frame(content: str) -> int:
-    """从 equ 内容提取 [icon] 的 frame"""
-    match = re.search(r'\[icon\]\s*\n\s*`[^`]*`\s+(\d+)', content)
-    return int(match.group(1)) if match else -1
+def extract_icon_info(content: str) -> Tuple[str, int]:
+    """从 equ 内容提取 [icon] 的路径和 frame"""
+    match = re.search(r'\[icon\]\s*\n\s*`([^`]*)`\s+(\d+)', content)
+    if match:
+        return match.group(1).strip(), int(match.group(2))
+    return "", 0
+
+
+def is_valid_icon_path_strict(icon_path: str) -> bool:
+    """
+    严格验证 icon 路径格式
+    必须符合: item/avatar/{标准职业目录}/{前缀}_a{部位}.img
+    """
+    if not icon_path:
+        return False
+    
+    match = STRICT_ICON_PATH_PATTERN.match(icon_path)
+    if not match:
+        return False
+    
+    job_folder = match.group(1).lower()
+    return job_folder in VALID_JOB_FOLDERS
 
 
 def extract_hide_equipment(content: str) -> List[str]:
-    """
-    从 equ 内容提取 [hide equipment] 中的部位列表
-    
-    返回部位列表（如 ['cap', 'hair']）
-    """
+    """从 equ 内容提取 [hide equipment] 中的部位列表"""
     hide_parts = []
     
-    # 匹配 [hide equipment] 段
     match = re.search(
         r'\[hide equipment\](.*?)\[/hide equipment\]',
         content,
@@ -142,10 +149,8 @@ def extract_hide_equipment(content: str) -> List[str]:
     
     if match:
         section = match.group(1)
-        # 提取所有 `...` 中的装备类型
         for equ_type_match in re.finditer(r'`([^`]+)`', section):
             equ_type = equ_type_match.group(1).strip()
-            # 转换为部位
             part = EQU_TYPE_TO_PART.get(equ_type)
             if part and part not in hide_parts:
                 hide_parts.append(part)
@@ -153,23 +158,24 @@ def extract_hide_equipment(content: str) -> List[str]:
     return hide_parts
 
 
+def has_expand_ani(content: str) -> bool:
+    """检查 equ 内容是否包含 [expand ani] 标签"""
+    return bool(re.search(r'\[expand ani\]', content, re.IGNORECASE))
+
+
 def parse_variation(variation_str: str) -> Tuple[int, int]:
     """解析 variation 字符串为 (code, suffix)"""
     if not variation_str:
         return (0, 0)
     
-    # 尝试分割（支持制表符或下划线）
     parts = variation_str.replace('\t', '_').split('_')
     
     if len(parts) >= 2:
         try:
-            code = int(parts[0])
-            suffix = int(parts[1])
-            return (code, suffix)
+            return (int(parts[0]), int(parts[1]))
         except ValueError:
             pass
     
-    # 尝试作为完整数字解析
     try:
         full = int(variation_str)
         if full < 100:
@@ -189,18 +195,33 @@ def get_job_key(career: str) -> Optional[str]:
 
 def get_part(equipment_type: str) -> str:
     """将 equipment_type 转换为 avatar_config part"""
-    # 清理字符串
     eq_type = equipment_type.lower()
     eq_type = eq_type.replace('[', '').replace(']', '').replace('avatar', '').strip()
     return EQUIP_TYPE_MAP.get(eq_type, eq_type)
 
 
-def find_config_item(config: Dict, job_key: str, part: str, code: int, suffix: int) -> Optional[Tuple[str, Dict]]:
+def get_job_for_matcher(job_key: str) -> Optional[str]:
     """
-    在 avatar_config.json 中查找对应的 item
+    将 avatar_config job_key 转换为 IconMatcher 使用的 job
     
-    返回 (code_str, item_dict) 或 None
+    例如: 'fighter_male' -> 'atfighter'
     """
+    reverse_map = {
+        'swordman_male': 'swordman',
+        'fighter_female': 'fighter',
+        'fighter_male': 'atfighter',
+        'gunner_male': 'gunner',
+        'gunner_female': 'atgunner',
+        'mage_female': 'mage',
+        'mage_male': 'atmage',
+        'priest_male': 'priest',
+        'thief_female': 'thief',
+    }
+    return reverse_map.get(job_key)
+
+
+def find_config_item(config: Dict, job_key: str, part: str, code: int, suffix: int) -> Optional[Tuple[str, Dict]]:
+    """在 avatar_config.json 中查找对应的 item"""
     if job_key not in config:
         return None
     
@@ -209,15 +230,11 @@ def find_config_item(config: Dict, job_key: str, part: str, code: int, suffix: i
         return None
     
     part_items = items[part]
-    
-    # 构建查找的 code（如 "10203"）
     search_code = f"{code}{suffix:02d}"
     
-    # 精确匹配
     if search_code in part_items:
         return (search_code, part_items[search_code])
     
-    # 尝试无前导零匹配
     for code_str, item in part_items.items():
         try:
             if int(code_str) == int(search_code):
@@ -244,25 +261,41 @@ def backup_config(config_path: Path, backup_dir: Optional[Path] = None) -> Path:
     return backup_path
 
 
-def update_config_item(item: Dict, name: str, frame: int, hide_parts: List[str]):
-    """更新配置 item"""
+def update_config_item(
+    item: Dict,
+    name: str,
+    frame: int,
+    hide_parts: List[str],
+    icon_path_valid: bool,
+    name_is_english_only: bool = False,
+    frame_from_icon_match: bool = False
+):
+    """
+    更新配置 item
+    
+    Args:
+        frame_from_icon_match: frame 是否来自图标匹配（vs 直接读取）
+    """
     updates = []
     
-    # 更新 name
-    if name:
+    # 更新 name（除非是英文+数字组合）
+    if name and not name_is_english_only:
         old_name = item.get('name', '')
         if old_name != name:
             item['name'] = name
             updates.append(f"name: '{old_name}' -> '{name}'")
+    elif name_is_english_only:
+        updates.append(f"name: 未更新 (英文+数字组合)")
     
     # 更新 frame
     if frame >= 0:
         old_frame = item.get('frame', -1)
+        source = "图标匹配" if frame_from_icon_match else "equ文件"
         if old_frame != frame:
             item['frame'] = frame
-            updates.append(f"frame: {old_frame} -> {frame}")
+            updates.append(f"frame: {old_frame} -> {frame} (来自{source})")
     
-    # 更新 hide_parts
+    # 始终更新 hide_parts
     if hide_parts is not None:
         old_hide = item.get('hide_parts', [])
         if set(old_hide) != set(hide_parts):
@@ -285,21 +318,32 @@ def save_config(path: Path, config: Dict):
     logger.info(f"配置已保存: {path}")
 
 
-def process_all_equ(extractor: AvatarExtractor, config: Dict) -> Tuple[int, int]:
+def process_all_equ(
+    extractor: AvatarExtractor,
+    config: Dict,
+    icon_matcher: Optional[IconMatcher] = None
+) -> Tuple[int, int, int, int]:
     """
     处理所有 equ 文件
     
-    返回 (处理数, 更新数)
+    Returns:
+        (处理数, 标准路径数, 图标匹配数, 更新数)
     """
     processed = 0
+    standard_path_count = 0
+    icon_match_count = 0
     updated = 0
     
     for path, avatar_data in extractor.avatar_data.items():
         processed += 1
         
-        # 获取文件内容
         content = extractor.file_content_cache.get(path, "")
         if not content:
+            continue
+        
+        # 跳过包含 [expand ani] 的 equ 文件
+        if has_expand_ani(content):
+            logger.debug(f"跳过 [expand ani] 装备: {path}")
             continue
         
         # 提取 name
@@ -307,13 +351,48 @@ def process_all_equ(extractor: AvatarExtractor, config: Dict) -> Tuple[int, int]
         if not name:
             continue
         
-        # 筛选：跳过英文+数字的 name
-        if is_english_number_only(name):
-            logger.debug(f"跳过 [{name}]: 符合英文+数字模式")
-            continue
+        # 检查 name 是否为英文+数字组合
+        name_is_english_only = is_english_number_only(name)
         
-        # 提取其他信息
-        frame = extract_frame(content)
+        # 提取 icon 信息
+        icon_path, frame = extract_icon_info(content)
+        
+        # 验证 icon 路径
+        icon_path_valid = is_valid_icon_path_strict(icon_path)
+        frame_from_icon_match = False
+        
+        if icon_path_valid:
+            # 标准路径，直接使用 equ 中的 frame
+            standard_path_count += 1
+        elif icon_matcher:
+            # 非标准路径，尝试图标匹配
+            job_key = get_job_key(avatar_data.career)
+            part = get_part(avatar_data.equipment_type)
+            matcher_job = get_job_for_matcher(job_key) if job_key else None
+            
+            if matcher_job and icon_path and frame >= 0:
+                matched_frame = icon_matcher.find_matching_frame(
+                    job=matcher_job,
+                    part=part,
+                    pvf_img=icon_path,
+                    pvf_frame=frame
+                )
+                if matched_frame is not None:
+                    frame = matched_frame
+                    icon_match_count += 1
+                    frame_from_icon_match = True
+                    logger.info(f"图标匹配成功: {path} -> {job_key}/{part} frame {matched_frame}")
+                else:
+                    logger.warning(f"图标匹配失败: {path} (icon: {icon_path}#{frame})")
+                    # 保留原始 frame，但标记为无效
+                    frame = -1
+            else:
+                frame = -1
+        else:
+            # 没有 icon_matcher，非标准路径不更新 frame
+            frame = -1
+        
+        # 提取 hide_parts
         hide_parts = extract_hide_equipment(content)
         
         # 映射职业和部位
@@ -322,41 +401,35 @@ def process_all_equ(extractor: AvatarExtractor, config: Dict) -> Tuple[int, int]
         var_code, suffix = parse_variation(avatar_data.variation)
         
         if not job_key:
-            logger.warning(f"未知职业: {avatar_data.career}")
             continue
-        
-        logger.info(f"\n处理: {path}")
-        logger.info(f"  职业: {avatar_data.career} -> {job_key}")
-        logger.info(f"  部位: {avatar_data.equipment_type} -> {part}")
-        logger.info(f"  Variation: {avatar_data.variation} -> ({var_code}, {suffix})")
-        logger.info(f"  Name: {name}")
-        logger.info(f"  Frame: {frame}")
-        logger.info(f"  Hide parts: {hide_parts}")
         
         # 查找配置中的对应项
         result = find_config_item(config, job_key, part, var_code, suffix)
         
         if result:
             code_str, item = result
-            logger.info(f"  找到匹配: {job_key}/{part}/{code_str}")
             
-            updates = update_config_item(item, name, frame, hide_parts)
+            updates = update_config_item(
+                item, name, frame, hide_parts,
+                icon_path_valid, name_is_english_only,
+                frame_from_icon_match
+            )
             if updates:
                 for update in updates:
-                    logger.info(f"    更新: {update}")
+                    logger.info(f"  [{path}] {update}")
                 updated += 1
-            else:
-                logger.info(f"    无变化")
         else:
-            logger.warning(f"  未找到匹配: {job_key}/{part}/({var_code}, {suffix})")
+            logger.debug(f"未找到匹配配置: {job_key}/{part}/({var_code}, {suffix})")
     
-    return processed, updated
+    return processed, standard_path_count, icon_match_count, updated
 
 
 def main():
     import argparse
     
-    parser = argparse.ArgumentParser(description='从 PVF equ 文件同步数据到 avatar_config.json')
+    parser = argparse.ArgumentParser(
+        description='从 PVF equ 文件同步数据到 avatar_config.json (v5 - 图标对比匹配)'
+    )
     parser.add_argument('--config', type=Path, default=Path('avatar_config.json'),
                         help='avatar_config.json 路径')
     parser.add_argument('--backup-dir', type=Path, default=None,
@@ -370,6 +443,16 @@ def main():
     parser.add_argument('--no-backup', action='store_true',
                         help='不创建备份')
     
+    # 图标匹配相关参数（可选，默认使用config.py中的配置）
+    parser.add_argument('--standard-npk-dir', type=Path, default=STANDARD_NPK_DIR,
+                        help='标准NPK目录路径（默认使用config.py中的STANDARD_NPK_DIR）')
+    parser.add_argument('--pvf-npk-dir', type=Path, default=PVF_NPK_DIR,
+                        help='PVF NPK目录路径（默认使用config.py中的PVF_NPK_DIR）')
+    parser.add_argument('--skip-icon-match', action='store_true',
+                        help='跳过图标匹配（仅使用标准路径）')
+    parser.add_argument('--rebuild-cache', action='store_true',
+                        help='强制重建标准图标缓存')
+    
     args = parser.parse_args()
     
     # 加载配置
@@ -380,6 +463,23 @@ def main():
     # 创建备份
     if not args.no_backup and not args.dry_run:
         backup_config(args.config, args.backup_dir)
+    
+    # 初始化图标匹配器
+    icon_matcher = None
+    if not args.skip_icon_match:
+        logger.info("初始化图标匹配器...")
+        icon_matcher = IconMatcher(
+            standard_npk_dir=args.standard_npk_dir,
+            pvf_npk_dir=args.pvf_npk_dir
+        )
+        
+        # 构建标准图标缓存
+        logger.info("构建标准图标缓存...")
+        icon_matcher.build_standard_cache(force_rebuild=args.rebuild_cache)
+        
+        # 构建PVF NPK映射
+        logger.info("构建PVF NPK映射...")
+        icon_matcher.build_pvf_npk_map()
     
     # 创建提取器
     logger.info(f"连接 PVF API: {args.host}:{args.port}")
@@ -397,10 +497,19 @@ def main():
     
     # 处理并更新
     logger.info("\n处理 equ 文件...")
-    processed, updated = process_all_equ(extractor, config)
+    try:
+        processed, standard_count, match_count, updated = process_all_equ(
+            extractor, config, icon_matcher
+        )
+    finally:
+        # 确保释放资源
+        if icon_matcher:
+            icon_matcher.close()
     
     logger.info(f"\n完成:")
     logger.info(f"  处理文件: {processed}")
+    logger.info(f"  标准路径: {standard_count}")
+    logger.info(f"  图标匹配: {match_count}")
     logger.info(f"  更新 items: {updated}")
     
     # 保存

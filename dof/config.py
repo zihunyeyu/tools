@@ -26,6 +26,13 @@ NPK_KR_DIR = Path(r"D:\BaiduNetdiskDownload\ImagePacks2\\")
 NPK_JP_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\日本-正式服\\")
 NPK_NA_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\北美地区-正式服\\")
 
+# ==================== 图标匹配配置 ====================
+# 标准NPK目录（包含 sprite_item_avatar_xxx.NPK 的目录）
+STANDARD_NPK_DIR = Path(r"E:\DOF\Tools\blackcat.6.12\output\Download\中国大陆-魔界")
+
+# PVF NPK目录（PVF对应的NPK文件目录）
+PVF_NPK_DIR = Path(r"E:\DOF\Clients\DNF\ImagePacks2")
+
 # 数据文件路径
 DATA_DIR = BASE_DIR / "data"
 DATA_DIR.mkdir(exist_ok=True)

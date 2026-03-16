@@ -8970,6 +8970,7 @@ class DressingRoomApp:
         # 创建右键菜单
         menu = tk.Menu(self.root, tearoff=0)
         menu.add_command(label="✏️ 修改套装名", command=lambda: self._rename_suit(suit_name))
+        menu.add_command(label="📦 拓展套装", command=lambda: self._expand_suit(suit_name))
         menu.add_separator()
         menu.add_command(label="🗑️ 删除套装", command=lambda: self._delete_suit(suit_name))
         
@@ -9094,6 +9095,17 @@ class DressingRoomApp:
                 self.status_label.config(text=f"已删除套装: {suit_name}")
             else:
                 messagebox.showerror("错误", f"删除套装【{suit_name}】失败")
+
+    def _expand_suit(self, suit_name: str):
+        """拓展套装 - 打开拓展对话框"""
+        job_str = self.job_var.get()
+        if not job_str:
+            return
+
+        job_key = self.job_name_to_key.get(job_str, job_str) if job_str else ""
+        
+        # 打开拓展套装对话框
+        dialog = ExpandSuitDialog(self.root, self, job_key, suit_name)
 
     def _clear_render_cache(self):
         """清除渲染相关缓存（隐藏关系或装备改变时调用）"""
@@ -9306,7 +9318,7 @@ class DressingRoomApp:
         return canvas
 
     def _on_item_right_click(self, event, item_index: int):
-        """右键点击时装项 - 仅在3D模式下可用"""
+        """右键点击时装项 - 直接打开分配图标对话框"""
         # 图标模式下禁用右键菜单
         if self.show_icons:
             return
@@ -9336,6 +9348,11 @@ class DressingRoomApp:
             else ""
         )
 
+        # 直接打开分配图标对话框
+        self._open_assign_icon_dialog(job_key, part, equip_code, original_idx)
+
+    def _open_assign_icon_dialog(self, job_key: str, part: str, equip_code: str, original_idx: int):
+        """打开分配图标对话框"""
         dialog = AssignIconDialog(
             self.root, self, job_key, part, equip_code, original_idx
         )
@@ -9355,6 +9372,63 @@ class DressingRoomApp:
             # 状态提示
             self.status_label.config(text=f"已更新时装信息: {part} {equip_code}")
 
+    def _get_series_codes_for_item(self, job_key: str, part: str, equip_code: str) -> List[str]:
+        """
+        获取同系列的所有时装code列表（按code数字大小排序）
+        
+        同系列定义：
+        基于 NPK 文件名中的系列号（如 coat1000 中的 "1000"），
+        同一系列号的所有 code 都属于同系列，无论它们来自哪个 IMG 文件。
+        
+        例如：
+        - coat1000（IMGv6，多调色板）展开为 code 1000, 1001, 1002
+        - coat1003（IMGv2/v4，独立文件）为 code 1003
+        - 它们都属于 coat1000 系列，系列号为 "1000"
+        
+        系列号提取规则：
+        - 文件名 coat1000 → 系列号 1000
+        - 多调色板展开 code 1000,1001,1002 → 都属于系列 1000
+        - 独立文件 code 1003 → 文件名 coat1003 → 系列号 1003
+        - 如果 1003 应该属于 1000 系列，需要在配置中指定关联关系
+        
+        Returns: 按数字大小排序的code字符串列表
+        """
+        series_map = self.loader.code_to_series.get(part, {})
+        target_series_key = series_map.get(equip_code)
+        
+        if not target_series_key:
+            return [equip_code]
+        
+        # 提取目标系列号（文件名中的 base_code）
+        # mp_1000 -> 1000, s_1003 -> 1003
+        if target_series_key.startswith("mp_"):
+            target_series_id = int(target_series_key[3:])
+        elif target_series_key.startswith("s_"):
+            target_series_id = int(target_series_key[2:])
+        else:
+            return [equip_code]
+        
+        series = []
+        
+        for code, key in series_map.items():
+            if key.startswith("mp_"):
+                # 多调色板系列：所有展开的 code 都属于该系列
+                mp_base = int(key[3:])
+                if mp_base == target_series_id:
+                    series.append(code)
+            elif key.startswith("s_"):
+                # 独立文件：根据文件名中的系列号判断
+                s_base = int(key[2:])
+                if s_base == target_series_id:
+                    series.append(code)
+        
+        # 如果没有找到同系列，返回当前 code
+        if not series:
+            return [equip_code]
+        
+        # 按数字大小排序
+        series.sort(key=lambda x: int(x))
+        return series
 
 # =============================================================================
 # 分配图标对话框
@@ -9441,17 +9515,12 @@ class AssignIconDialog:
         if existing_name:
             self.name_entry.insert(0, existing_name)
         
-        # 【应用同系列装扮】按钮（仅时装部位显示）
-        if self.part in ("cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin"):
-            tk.Button(
-                name_frame,
-                text="应用同系列装扮",
-                command=self._on_apply_series,
-                bg=tm.get("accent_secondary"),
-                fg="white",
-                font=("Arial", 9),
-                width=16,
-            ).pack(side=tk.LEFT, padx=5)
+        # 同系列时装数据（用于标签页）
+        self.series_codes = []
+        self.series_check_vars = {}  # {code: BooleanVar}
+        self.series_name_vars = {}  # {code: StringVar}
+        self.series_frame_widgets = {}  # {code: frame_widget}
+        self.series_tab_frame = None  # 同系列标签页框架
 
         # 创建水平容器，将预览和隐藏部位并排显示
         top_frame = tk.Frame(self.dialog, bg=tm.get("bg_primary"))
@@ -9491,6 +9560,13 @@ class AssignIconDialog:
         self.custom_frame = tk.Frame(self.notebook, bg=tm.get("bg_primary"))
         self.notebook.add(self.custom_frame, text="自定义NPK图标")
         self._create_custom_tab()
+
+        # 同系列图标标签页（仅当时装部位且存在同系列时装时显示）
+        self.series_codes = self._get_series_codes()
+        if self.part in ("cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin") and len(self.series_codes) > 1:
+            self.series_tab_frame = tk.Frame(self.notebook, bg=tm.get("bg_primary"))
+            self.notebook.add(self.series_tab_frame, text="🔄 同系列图标")
+            self._setup_series_tab()
 
         # 套装信息标签页
         self.suit_frame = tk.Frame(self.notebook, bg=tm.get("bg_primary"))
@@ -9695,111 +9771,28 @@ class AssignIconDialog:
         except Exception as e:
             return None
 
-    # ==================== 应用同系列装扮功能 ====================
-    def _on_apply_series(self):
-        """应用同系列装扮按钮点击"""
-        base_name = self.name_entry.get().strip()
-        if not base_name:
-            messagebox.showwarning("提示", "请先输入时装名称", parent=self.dialog)
-            return
-        
-        # 检查是否为时装部位（9个时装部位，不包含weapon）
-        if self.part not in ("cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin"):
-            messagebox.showinfo("提示", "该功能仅支持时装部位", parent=self.dialog)
-            return
-        
-        # 获取同系列时装
-        series = self._get_series_codes()
-        if len(series) <= 1:
-            messagebox.showinfo("提示", "未检测到同系列的其他时装", parent=self.dialog)
-            return
-        
-        # 显示确认对话框
-        selected_codes = self._show_series_confirm_dialog(base_name, series)
-        if selected_codes is None:
-            return  # 用户取消
-        
-        # 获取当前对话框中的隐藏部位选择（同步到所有同系列时装）
-        hide_parts = [part for part, var in self.hide_parts_vars.items() if var.get()]
-        
-        # 应用名称
-        success_count = 0
-        skip_count = 0
-        
-        for code in selected_codes:
-            # 获取该code在series中的索引（用于生成款式编号）
-            style_num = series.index(code) + 1
-            new_name = f"{base_name}[款式{style_num}]"
-            
-            # 检查该时装是否已有图标配置
-            item_config = self.app.suit_loader.get_item_config(
-                self.job_key, self.part, code
-            )
-            
-            # 检查该时装是否已有图标配置（优化版：通过frame字段判断）
-            has_icon = item_config and item_config.get("frame") is not None and item_config.get("frame") != -1
-            
-            if has_icon:
-                # 有图标：保留原有图标配置，只更新名称和隐藏部位
-                frame = item_config.get("frame")
-                img = item_config.get("img")
-                
-                # 构建保留图标的数据（优化版：不再设置icon_type）
-                updated_config = {
-                    "name": new_name,
-                    "frame": frame,
-                    "hide_parts": hide_parts,
-                }
-                if img:
-                    updated_config["img"] = img
-                
-                # 直接更新配置
-                config = self.app.suit_loader._load_or_convert_config(self.job_key)
-                if config:
-                    if "items" not in config:
-                        config["items"] = {}
-                    if self.part not in config["items"]:
-                        config["items"][self.part] = {}
-                    config["items"][self.part][code] = updated_config
-                    
-                    if self.app.suit_loader._save_config(self.job_key, config):
-                        # 更新内存缓存
-                        self.app.suit_loader.item_names.setdefault(self.job_key, {}).setdefault(self.part, {})[code] = new_name
-                        success_count += 1
-                    else:
-                        skip_count += 1
-                else:
-                    skip_count += 1
-            else:
-                # 无图标：使用 save_item_without_icon 保存
-                if self.app.suit_loader.save_item_without_icon(
-                    self.job_key, self.part, code, new_name, hide_parts
-                ):
-                    success_count += 1
-                else:
-                    skip_count += 1
-        
-        # 提示结果
-        if success_count > 0:
-            messagebox.showinfo(
-                "成功",
-                f"已成功应用 {success_count} 件同系列时装名称\n"
-                + (f"失败: {skip_count} 件" if skip_count > 0 else ""),
-                parent=self.dialog
-            )
-            self.result = True
-        else:
-            messagebox.showerror("错误", "没有成功应用任何时装名称", parent=self.dialog)
-
     def _get_series_codes(self) -> List[str]:
         """
         获取同系列的所有时装code列表（按code数字大小排序）
         
-        同系列定义：
-        - 多调色板文件：同一base_code展开的所有code（如4000的4个调色板→4000,4001,4002,4003）
-        - 独立文件：code的前N-2位相同的视为同系列（如6300,6301,6302都是编号63的系列）
-          规则：code的最后两位是序号，前面的是编号，编号相同的为同系列
-          例如：6300 -> 编号63 + 序号00，6310 -> 编号63 + 序号10，它们都是63系列
+        同系列定义（跨文件）：
+        基于 NPK 文件名中的系列号，同一系列号的所有 code 都属于同系列，
+        无论它们来自哪个 IMG 文件（多调色板或独立文件）。
+        
+        例如：
+        - coat1000（IMGv6，多调色板）展开为 code 1000, 1001, 1002
+        - coat1003（IMGv2/v4，独立文件）为 code 1003
+        - 它们都属于系列号 "1000"（文件名中的系列标识）
+        
+        系列号提取规则：
+        - mp_1000 -> 系列号 1000（多调色板文件 coat1000）
+        - s_1003 -> 系列号 1003（独立文件 coat1003）
+        - 但 coat1003 可以通过配置关联到 coat1000 系列
+        
+        增强逻辑：
+        1. 首先收集同一系列号的所有 code（包括多调色板展开的）
+        2. 然后检查是否有相邻系列号的 code 应该纳入（如 coat1003 的 1003 可以纳入 1000 系列）
+        3. 通过 code 范围判断连续性（如 1000-1003 是连续的）
         
         Returns: 按数字大小排序的code字符串列表
         """
@@ -9810,225 +9803,97 @@ class AssignIconDialog:
         if not target_series_key:
             return [self.equip_code]
         
-        # 情况1：多调色板系列（mp_开头）
+        # 提取当前系列号
         if target_series_key.startswith("mp_"):
-            series = [code for code, key in series_map.items() if key == target_series_key]
-            series.sort(key=lambda x: int(x))
-            return series
+            target_series_id = int(target_series_key[3:])
+        elif target_series_key.startswith("s_"):
+            target_series_id = int(target_series_key[2:])
+        else:
+            return [self.equip_code]
         
-        # 情况2：独立文件系列（s_开头）- 按编号分组（code最后两位是序号，前面是编号）
-        if target_series_key.startswith("s_"):
-            # 获取当前code的编号（去掉最后两位）
-            current_code_str = self.equip_code
-            if len(current_code_str) >= 2:
-                target_series_id = current_code_str[:-2]  # 例如 "6300" -> "63"
-            else:
-                target_series_id = "0"
+        # 第一步：收集所有同一系列号的 code
+        series_codes = set()
+        
+        for code, key in series_map.items():
+            if key.startswith("mp_"):
+                mp_base = int(key[3:])
+                if mp_base == target_series_id:
+                    series_codes.add(code)
+            elif key.startswith("s_"):
+                s_base = int(key[2:])
+                if s_base == target_series_id:
+                    series_codes.add(code)
+        
+        # 第二步：循环扩展系列 - 持续检查直到没有新的 code 被添加
+        # 规则：如果相邻系列号的 code 与当前系列形成连续序列，则纳入
+        # 例如：1000,1001,1002（系列1000）和 1003（系列1003）形成连续序列
+        max_iterations = 10  # 防止无限循环
+        for _ in range(max_iterations):
+            old_count = len(series_codes)
+            all_codes = sorted([int(c) for c in series_codes])
             
-            # 收集所有相同编号的code
-            series = []
-            for code, key in series_map.items():
-                if key.startswith("s_"):
-                    if len(code) >= 2:
-                        series_id = code[:-2]
-                    else:
-                        series_id = "0"
+            if not all_codes:
+                break
+                
+            min_code = min(all_codes)
+            max_code = max(all_codes)
+            
+            # 查找与当前范围相邻的 code
+            for other_code, other_key in series_map.items():
+                if other_code in series_codes:
+                    continue
                     
-                    if series_id == target_series_id:
-                        series.append(code)
+                other_code_int = int(other_code)
+                
+                # 如果 other_code 与当前系列范围相邻（相差1）或在范围内
+                if min_code - 1 <= other_code_int <= max_code + 1:
+                    # 检查是否是相邻的系列号
+                    if other_key.startswith("mp_"):
+                        other_base = int(other_key[3:])
+                    elif other_key.startswith("s_"):
+                        other_base = int(other_key[2:])
+                    else:
+                        continue
+                    
+                    # 如果系列号相邻或在合理范围内，纳入同系列
+                    # 例如：系列1000的1002和系列1003的1003是连续的
+                    if abs(other_base - target_series_id) <= 20:
+                        # 纳入该系列的所有 code
+                        for c, k in series_map.items():
+                            if k == other_key:
+                                series_codes.add(c)
             
-            series.sort(key=lambda x: int(x))
-            return series
+            # 如果没有新的 code 被添加，停止循环
+            if len(series_codes) == old_count:
+                break
         
-        return [self.equip_code]
-
-    def _show_series_confirm_dialog(self, base_name: str, series: List[str]) -> Optional[List[str]]:
-        """
-        显示同系列应用确认对话框
-        
-        Args:
-            base_name: 基础名称
-            series: 同系列code列表（已排序）
+        # 第三步：检查范围内是否有遗漏的 code（补全连续序列）
+        if series_codes:
+            final_codes = sorted([int(c) for c in series_codes])
+            code_range = range(min(final_codes), max(final_codes) + 1)
             
-        Returns: 用户选择的code列表，None表示取消
-        """
-        tm = self.app.theme_manager
+            for code_int in code_range:
+                code_str = str(code_int)
+                if code_str not in series_codes and code_str in series_map:
+                    # 检查该 code 的系列号是否在合理范围内
+                    other_key = series_map[code_str]
+                    if other_key.startswith("mp_"):
+                        other_base = int(other_key[3:])
+                    elif other_key.startswith("s_"):
+                        other_base = int(other_key[2:])
+                    else:
+                        continue
+                    
+                    # 如果系列号与目标系列号相差不大，纳入
+                    if abs(other_base - target_series_id) <= 20:
+                        series_codes.add(code_str)
         
-        dialog = tk.Toplevel(self.dialog)
-        dialog.title("应用同系列装扮 - 确认")
-        dialog.transient(self.dialog)
-        dialog.grab_set()
-        dialog.configure(bg=tm.get("bg_primary"))
+        if not series_codes:
+            return [self.equip_code]
         
-        # 设置大小和位置
-        dialog.geometry("550x500")
-        self.app._center_window(dialog, 550, 500)
-        dialog.minsize(500, 400)
-        
-        # 基础信息
-        tk.Label(
-            dialog,
-            text=f"基础名称: {base_name}",
-            font=("Arial", 11, "bold"),
-            bg=tm.get("bg_primary"),
-            fg=tm.get("fg_primary"),
-        ).pack(anchor=tk.W, padx=10, pady=(10, 5))
-        
-        # 系列列表
-        list_frame = tk.Frame(dialog, bg=tm.get("bg_primary"))
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
-        
-        tk.Label(
-            list_frame,
-            text=f"同系列时装 (共{len(series)}件):",
-            font=("Arial", 10),
-            bg=tm.get("bg_primary"),
-            fg=tm.get("fg_secondary"),
-        ).pack(anchor=tk.W)
-        
-        # 创建带滚动条的列表
-        canvas = tk.Canvas(list_frame, bg=tm.get("bg_primary"), highlightthickness=0)
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
-        scroll_frame = tk.Frame(canvas, bg=tm.get("bg_primary"))
-        
-        scroll_frame.bind(
-            "<Configure>",
-            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
-        )
-        
-        canvas.create_window((0, 0), window=scroll_frame, anchor="nw", width=510)
-        canvas.configure(yscrollcommand=scrollbar.set)
-        
-        # 复选框变量
-        check_vars = {}
-        existing_items = []  # 已有名称的项目
-        
-        for i, code in enumerate(series, 1):
-            # 检查是否已有名称
-            existing_name = self.app.suit_loader.get_item_name(
-                self.job_key, self.part, code
-            )
-            
-            # 生成新名称
-            new_name = f"{base_name}[款式{i}]"
-            
-            # 创建行
-            row_frame = tk.Frame(scroll_frame, bg=tm.get("bg_primary"))
-            row_frame.pack(fill=tk.X, pady=2)
-            
-            var = tk.BooleanVar(value=True)  # 默认勾选
-            check_vars[code] = var
-            
-            cb = ttk.Checkbutton(row_frame, variable=var)
-            cb.pack(side=tk.LEFT)
-            
-            # 显示信息
-            display_text = f"{CN_PART_NAMES.get(self.part, self.part)}{code}"
-            display_text += f" → {new_name}"
-            
-            text_color = tm.get("fg_primary")
-            if existing_name:
-                display_text += f"  [已有: {existing_name}]"
-                text_color = tm.get("accent_warning")
-                existing_items.append(code)
-                var.set(False)  # 已有名称的默认不勾选
-            
-            label = tk.Label(
-                row_frame,
-                text=display_text,
-                font=("Arial", 9),
-                bg=tm.get("bg_primary"),
-                fg=text_color,
-                anchor=tk.W
-            )
-            label.pack(side=tk.LEFT, padx=5)
-        
-        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        # 全选/取消全选按钮
-        btn_frame = tk.Frame(dialog, bg=tm.get("bg_primary"))
-        btn_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        def select_all():
-            for var in check_vars.values():
-                var.set(True)
-        
-        def deselect_all():
-            for var in check_vars.values():
-                var.set(False)
-        
-        tk.Button(
-            btn_frame,
-            text="☑ 全选",
-            command=select_all,
-            bg=tm.get("button_bg"),
-            fg=tm.get("button_fg"),
-            font=("Arial", 9),
-            width=10,
-        ).pack(side=tk.LEFT, padx=5)
-        
-        tk.Button(
-            btn_frame,
-            text="☐ 取消全选",
-            command=deselect_all,
-            bg=tm.get("button_bg"),
-            fg=tm.get("button_fg"),
-            font=("Arial", 9),
-            width=10,
-        ).pack(side=tk.LEFT, padx=5)
-        
-        # 提示文本
-        tk.Label(
-            dialog,
-            text="说明: 勾选的项目将被应用新名称，已有名称的项目需手动勾选才能覆盖\n隐藏部位设置将同步为当前对话框中的选择",
-            font=("Arial", 9),
-            bg=tm.get("bg_primary"),
-            fg=tm.get("fg_tertiary"),
-            wraplength=530,
-            justify=tk.LEFT,
-        ).pack(anchor=tk.W, padx=10, pady=5)
-        
-        # 结果
-        result = {"codes": None}
-        
-        def on_confirm():
-            selected = [code for code, var in check_vars.items() if var.get()]
-            if not selected:
-                messagebox.showwarning("提示", "请至少选择一项", parent=dialog)
-                return
-            result["codes"] = selected
-            dialog.destroy()
-        
-        def on_cancel():
-            dialog.destroy()
-        
-        # 确认按钮
-        confirm_btn_frame = tk.Frame(dialog, bg=tm.get("bg_primary"))
-        confirm_btn_frame.pack(fill=tk.X, padx=10, pady=10)
-        
-        tk.Button(
-            confirm_btn_frame,
-            text="确认应用",
-            command=on_confirm,
-            bg=tm.get("accent_primary"),
-            fg="white",
-            font=("Arial", 10, "bold"),
-            width=12,
-        ).pack(side=tk.RIGHT, padx=5)
-        
-        tk.Button(
-            confirm_btn_frame,
-            text="取消",
-            command=on_cancel,
-            bg=tm.get("bg_tertiary"),
-            fg=tm.get("fg_primary"),
-            font=("Arial", 10),
-            width=10,
-        ).pack(side=tk.RIGHT, padx=5)
-        
-        dialog.wait_window()
-        return result["codes"]
+        # 按数字大小排序
+        result = sorted(list(series_codes), key=lambda x: int(x))
+        return result
 
     def _create_button_frame(self):
         """创建按钮区域"""
@@ -10360,6 +10225,9 @@ class AssignIconDialog:
         self.selected_custom_img = None
         self.selected_custom_frame = None
         self._update_icon_grid()
+        # 刷新同系列标签页预览（如果存在）
+        if self.series_tab_frame and len(self.series_codes) > 1:
+            self._refresh_series_preview()
 
     def _prev_icon_page(self):
         total_pages = (
@@ -10704,6 +10572,463 @@ class AssignIconDialog:
         if self.custom_page < total_pages - 1:
             self.custom_page += 1
             self._update_custom_grid()
+
+    # ==================== 同系列图标标签页 ====================
+    def _setup_series_tab(self):
+        """设置同系列标签页"""
+        tm = self.app.theme_manager
+        
+        # 顶部说明区域
+        info_frame = tk.Frame(self.series_tab_frame, padx=10, pady=10, bg=tm.get("bg_primary"))
+        info_frame.pack(fill=tk.X)
+        
+        tk.Label(
+            info_frame,
+            text=f"同系列时装共 {len(self.series_codes)} 件，选择要应用当前图标配置的项目",
+            font=("Arial", 10),
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_secondary"),
+        ).pack(anchor=tk.W)
+        
+        # 全选/取消全选按钮
+        btn_frame = tk.Frame(self.series_tab_frame, padx=10, pady=5, bg=tm.get("bg_primary"))
+        btn_frame.pack(fill=tk.X)
+        
+        tk.Button(
+            btn_frame,
+            text="☑ 全选",
+            command=lambda: self._set_all_series_selection(True),
+            bg=tm.get("button_bg"),
+            fg=tm.get("button_fg"),
+            font=("Arial", 9),
+            width=10,
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame,
+            text="☐ 取消全选",
+            command=lambda: self._set_all_series_selection(False),
+            bg=tm.get("button_bg"),
+            fg=tm.get("button_fg"),
+            font=("Arial", 9),
+            width=10,
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # 一键应用名称按钮
+        tk.Button(
+            btn_frame,
+            text="📝 一键应用名称",
+            command=self._apply_series_names_from_entry,
+            bg=tm.get("accent_info"),
+            fg="white",
+            font=("Arial", 9, "bold"),
+            width=16,
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # 应用按钮
+        tk.Button(
+            btn_frame,
+            text="✓ 应用同系列图标",
+            command=self._apply_series_icons,
+            bg=tm.get("accent_secondary"),
+            fg="white",
+            font=("Arial", 9, "bold"),
+            width=16,
+        ).pack(side=tk.RIGHT, padx=5)
+        
+        # 创建滚动区域显示同系列时装
+        self._create_series_scroll_area()
+        
+        # 初始化复选框变量
+        for code in self.series_codes:
+            self.series_check_vars[code] = tk.BooleanVar(value=code == self.equip_code)
+        
+        # 创建标签页内容
+        self._create_series_tab_content()
+    
+    def _create_series_scroll_area(self):
+        """创建同系列时装的滚动区域"""
+        tm = self.app.theme_manager
+        
+        # 创建带滚动条的Canvas
+        self.series_canvas = tk.Canvas(
+            self.series_tab_frame,
+            bg=tm.get("bg_primary"),
+            highlightthickness=0,
+        )
+        
+        scrollbar = ttk.Scrollbar(
+            self.series_tab_frame,
+            orient="vertical",
+            command=self.series_canvas.yview
+        )
+        
+        self.series_scroll_frame = tk.Frame(
+            self.series_canvas,
+            bg=tm.get("bg_primary"),
+        )
+        
+        self.series_scroll_frame.bind(
+            "<Configure>",
+            lambda e: self.series_canvas.configure(scrollregion=self.series_canvas.bbox("all"))
+        )
+        
+        self.series_canvas.create_window((0, 0), window=self.series_scroll_frame, anchor="nw")
+        self.series_canvas.configure(yscrollcommand=scrollbar.set)
+        
+        self.series_canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=5)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+    
+    def _create_series_tab_content(self):
+        """创建同系列标签页内容（网格布局显示时装）"""
+        tm = self.app.theme_manager
+        
+        # 计算当前时装在系列中的位置，用于帧号偏移
+        try:
+            current_idx = self.series_codes.index(self.equip_code)
+        except ValueError:
+            current_idx = 0
+        
+        # 获取基础帧号
+        base_frame = self.selected_frame
+        
+        # 网格参数：每行4个，图标大小64x64
+        items_per_row = 4
+        icon_size = 64
+        padding = 10
+        
+        # 清除旧内容
+        for widget in self.series_scroll_frame.winfo_children():
+            widget.destroy()
+        self.series_frame_widgets.clear()
+        self.series_name_vars.clear()
+        
+        # 获取当前选择的图标帧（用于显示新帧号）
+        selected_frame = self.selected_frame
+        
+        for i, code in enumerate(self.series_codes):
+            row = i // items_per_row
+            col = i % items_per_row
+            
+            # 创建时装卡片框架
+            card = tk.Frame(
+                self.series_scroll_frame,
+                bg=tm.get("bg_secondary"),
+                highlightbackground=tm.get("border_primary"),
+                highlightthickness=2,
+                padx=8,
+                pady=8,
+            )
+            card.grid(row=row, column=col, padx=padding, pady=padding, sticky="nsew")
+            
+            # 标记当前编辑的时装
+            is_current = code == self.equip_code
+            if is_current:
+                card.configure(highlightbackground=tm.get("accent_primary"), highlightthickness=3)
+            
+            self.series_frame_widgets[code] = card
+            
+            # 复选框（当前时装默认勾选且不可取消）
+            var = self.series_check_vars.get(code)
+            if var is None:
+                var = tk.BooleanVar(value=is_current)
+                self.series_check_vars[code] = var
+            
+            cb = ttk.Checkbutton(
+                card,
+                text="",
+                variable=var,
+                state="disabled" if is_current else "normal",
+            )
+            cb.pack(anchor=tk.W)
+            
+            # 计算该时装的偏移帧号
+            offset = i - current_idx
+            target_frame = (base_frame + offset) if base_frame is not None else None
+            
+            # 图标预览（使用偏移后的图标帧预览）
+            icon_container = tk.Frame(card, bg=tm.get("bg_secondary"), width=icon_size, height=icon_size)
+            icon_container.pack(pady=3)
+            icon_container.pack_propagate(False)
+            
+            icon_label = tk.Label(icon_container, bg=tm.get("bg_secondary"))
+            icon_label.pack(expand=True)
+            
+            # 加载图标预览（使用偏移后的帧号）
+            self._load_series_item_icon(icon_label, code, target_frame)
+            
+            # 代码和当前编辑标记
+            code_text = f"【当前】{code}" if is_current else code
+            code_color = tm.get("accent_primary") if is_current else tm.get("fg_primary")
+            tk.Label(
+                card,
+                text=code_text,
+                font=("Arial", 9, "bold"),
+                bg=tm.get("bg_secondary"),
+                fg=code_color,
+            ).pack()
+            
+            # 帧号变化显示（使用偏移后的帧号）
+            old_frame = self.app.suit_loader.get_icon_frame(self.job_key, self.part, code)
+            if old_frame is not None and target_frame is not None:
+                if old_frame != target_frame:
+                    frame_text = f"帧号: {old_frame}→{target_frame}"
+                    frame_color = tm.get("accent_warning")
+                else:
+                    frame_text = f"帧号: {target_frame}"
+                    frame_color = tm.get("fg_secondary")
+            elif target_frame is not None:
+                frame_text = f"帧号: 无→{target_frame}"
+                frame_color = tm.get("accent_success")
+            elif old_frame is not None:
+                frame_text = f"帧号: {old_frame}→无"
+                frame_color = tm.get("accent_danger")
+            else:
+                frame_text = "帧号: 无"
+                frame_color = tm.get("fg_tertiary")
+            
+            tk.Label(
+                card,
+                text=frame_text,
+                font=("Arial", 8),
+                bg=tm.get("bg_secondary"),
+                fg=frame_color,
+            ).pack()
+            
+            # 时装名称输入框（可编辑）
+            name_frame = tk.Frame(card, bg=tm.get("bg_secondary"))
+            name_frame.pack(fill=tk.X, pady=(5, 0))
+            
+            tk.Label(
+                name_frame,
+                text="名称:",
+                font=("Arial", 8),
+                bg=tm.get("bg_secondary"),
+                fg=tm.get("fg_secondary"),
+            ).pack(side=tk.LEFT)
+            
+            # 获取现有名称或生成默认名称
+            existing_name = self.app.suit_loader.get_item_name(self.job_key, self.part, code)
+            if existing_name:
+                default_name = existing_name
+            else:
+                # 使用主输入框的名称 + 款式编号
+                base_name = self.name_entry.get().strip()
+                if not base_name:
+                    base_name = "时装"
+                style_num = i + 1
+                default_name = f"{base_name}[款式{style_num}]"
+            
+            name_var = tk.StringVar(value=default_name)
+            name_entry = tk.Entry(
+                name_frame,
+                textvariable=name_var,
+                font=("Arial", 8),
+                bg=tm.get("entry_bg"),
+                fg=tm.get("entry_fg"),
+                width=12,
+            )
+            name_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+            
+            # 存储名称输入框引用
+            if not hasattr(self, 'series_name_vars'):
+                self.series_name_vars = {}
+            self.series_name_vars[code] = name_var
+        
+        # 配置列权重使网格均匀分布
+        for col in range(items_per_row):
+            self.series_scroll_frame.columnconfigure(col, weight=1)
+    
+    def _load_series_item_icon(self, label: tk.Label, code: str, preview_frame: Optional[int]):
+        """加载同系列时装的图标预览
+        
+        Args:
+            label: 显示图标的Label控件
+            code: 时装代码
+            preview_frame: 预览的图标帧号（用户当前选择的帧）
+        """
+        tm = self.app.theme_manager
+        try:
+            # 优先使用预览帧（用户当前选择的图标）
+            if preview_frame is not None:
+                npk_name = self.app.suit_loader.get_icon_npk_name(self.job_key)
+                img_name = self.app.suit_loader.get_icon_img_name(self.job_key, self.part)
+                if npk_name and img_name:
+                    icon_img = self.app.icon_loader.get_icon(
+                        npk_name, img_name, preview_frame, (56, 56)
+                    )
+                    if icon_img:
+                        photo = ImageTk.PhotoImage(icon_img)
+                        label.config(image=photo)
+                        label.image = photo
+                        return
+            
+            # 回退到该时装已有的图标
+            icon_img = self._get_equip_icon(code)
+            if icon_img:
+                photo = ImageTk.PhotoImage(icon_img)
+                label.config(image=photo)
+                label.image = photo
+            else:
+                label.config(text="无图标", fg=tm.get("fg_tertiary"))
+        except Exception as e:
+            label.config(text="加载失败", fg=tm.get("fg_tertiary"))
+    
+    def _refresh_series_preview(self):
+        """刷新同系列标签页的预览（当选择新图标时调用）"""
+        if self.series_tab_frame and self.series_scroll_frame:
+            self._create_series_tab_content()
+    
+    def _set_all_series_selection(self, select: bool):
+        """全选或取消全选同系列时装
+        
+        Args:
+            select: True=全选, False=取消全选
+        """
+        for code, var in self.series_check_vars.items():
+            # 当前编辑的时装始终选中
+            if code == self.equip_code:
+                var.set(True)
+            else:
+                var.set(select)
+    
+    def _apply_series_icons(self):
+        """应用同系列图标配置（读取标签页复选框状态和名称输入）"""
+        # 检查是否为时装部位
+        if self.part not in ("cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin"):
+            messagebox.showinfo("提示", "该功能仅支持时装部位", parent=self.dialog)
+            return
+        
+        # 获取选中的code列表
+        selected_codes = [code for code, var in self.series_check_vars.items() if var.get()]
+        
+        if len(selected_codes) <= 1:
+            messagebox.showinfo("提示", "请至少选择一件其他同系列时装", parent=self.dialog)
+            return
+        
+        # 获取当前选择的图标帧和隐藏部位
+        base_frame = self.selected_frame
+        hide_parts = [part for part, var in self.hide_parts_vars.items() if var.get()]
+        
+        # 计算当前时装在系列中的位置
+        try:
+            current_idx = self.series_codes.index(self.equip_code)
+        except ValueError:
+            current_idx = 0
+        
+        # 收集要应用的配置信息用于显示
+        config_preview = []
+        for code in selected_codes:
+            # 获取该时装的名称
+            name_var = self.series_name_vars.get(code)
+            item_name = name_var.get().strip() if name_var else f"时装{code}"
+            
+            # 计算帧号
+            code_idx = self.series_codes.index(code)
+            offset = code_idx - current_idx
+            target_frame = (base_frame + offset) if base_frame is not None else None
+            
+            config_preview.append(f"  {code}: {item_name} (帧号:{target_frame if target_frame is not None else '无'})")
+        
+        # 确认对话框
+        preview_text = "\n".join(config_preview[:5])  # 最多显示5个
+        if len(config_preview) > 5:
+            preview_text += f"\n  ... 等共 {len(config_preview)} 件"
+        
+        if not messagebox.askyesno(
+            "确认应用",
+            f"确定要将以下配置应用到选中的同系列时装吗？\n\n"
+            f"{preview_text}\n\n"
+            f"隐藏部位: {', '.join(CN_PART_NAMES.get(p, p) for p in hide_parts) if hide_parts else '无'}",
+            parent=self.dialog
+        ):
+            return
+        
+        # 应用配置
+        success_count = 0
+        skip_count = 0
+        
+        for code in selected_codes:
+            # 获取该时装的名称（从输入框读取）
+            name_var = self.series_name_vars.get(code)
+            item_name = name_var.get().strip() if name_var else f"时装{code}"
+            
+            # 计算该时装的偏移帧号
+            code_idx = self.series_codes.index(code)
+            offset = code_idx - current_idx
+            target_frame = (base_frame + offset) if base_frame is not None else None
+            
+            # 应用配置
+            if target_frame is not None and target_frame >= 0:
+                cn_part = CN_PART_NAMES.get(self.part, self.part)
+                icon_marker = f"{cn_part}{target_frame}"
+                if self.app.suit_loader.add_or_update_item(
+                    self.job_key, self.part, code, icon_marker, item_name, hide_parts
+                ):
+                    success_count += 1
+                else:
+                    skip_count += 1
+            else:
+                # 无图标或帧号无效
+                if self.app.suit_loader.save_item_without_icon(
+                    self.job_key, self.part, code, item_name, hide_parts
+                ):
+                    success_count += 1
+                else:
+                    skip_count += 1
+        
+        # 提示结果
+        if success_count > 0:
+            messagebox.showinfo(
+                "成功",
+                f"已成功应用 {success_count} 件同系列时装\n"
+                + (f"失败: {skip_count} 件" if skip_count > 0 else ""),
+                parent=self.dialog
+            )
+            self.result = True
+        else:
+            messagebox.showerror("错误", "没有成功应用任何时装", parent=self.dialog)
+
+    def _apply_series_names_from_entry(self):
+        """
+        根据主输入框的名称一键应用到同系列所有时装
+        
+        命名规则：
+        - 主输入框名称为 "xxx"
+        - 同系列时装名称应用为 "xxx[款式1]", "xxx[款式2]", ...
+        """
+        # 获取主输入框的名称（基础名称）
+        base_name = self.name_entry.get().strip()
+        if not base_name:
+            messagebox.showwarning("警告", "请先输入基础时装名称", parent=self.dialog)
+            return
+        
+        # 确认对话框
+        if not messagebox.askyesno(
+            "确认应用名称",
+            f"确定要将名称 '{base_name}' 应用到同系列所有时装吗？\n\n"
+            f"命名规则: {base_name}[款式1], {base_name}[款式2], ...\n"
+            f"共 {len(self.series_codes)} 件时装",
+            parent=self.dialog
+        ):
+            return
+        
+        # 应用到所有同系列时装的名称输入框
+        updated_count = 0
+        for i, code in enumerate(self.series_codes):
+            name_var = self.series_name_vars.get(code)
+            if name_var:
+                # 生成款式名称：基础名称 + [款式序号]
+                style_name = f"{base_name}[款式{i + 1}]"
+                name_var.set(style_name)
+                updated_count += 1
+        
+        # StringVar 已与 Entry 绑定，修改后会自动更新 UI，无需刷新整个页面
+        messagebox.showinfo(
+            "成功",
+            f"已成功应用名称到 {updated_count} 件同系列时装",
+            parent=self.dialog
+        )
 
     # ==================== 套装信息标签页 ====================
     def _create_suit_tab(self):
@@ -11340,6 +11665,358 @@ class AssignIconDialog:
 
     def _on_cancel(self):
         self.dialog.destroy()
+
+
+class ExpandSuitDialog:
+    """拓展套装对话框 - 根据现有套装生成多个连续变装套装"""
+
+    def __init__(self, parent, app, job_key: str, suit_name: str):
+        self.app = app
+        self.job_key = job_key
+        self.suit_name = suit_name
+        self.result = False
+
+        # 获取原始套装数据
+        self.original_suit = self._get_suit_data(job_key, suit_name)
+        if not self.original_suit:
+            messagebox.showerror("错误", f"找不到套装: {suit_name}")
+            return
+
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title(f"拓展套装 - {suit_name}")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+
+        # 设置大小并居中
+        self.app._center_window(self.dialog, 600, 500)
+        self.dialog.minsize(600, 400)
+
+        self._create_ui()
+
+    def _get_suit_data(self, job_key: str, suit_name: str) -> Optional[Dict]:
+        """获取套装数据"""
+        suits = self.app.suit_loader.get_suits(job_key)
+        for suit in suits:
+            if suit.get("name") == suit_name:
+                return suit
+        return None
+
+    def _create_ui(self):
+        """创建界面"""
+        tm = self.app.theme_manager
+        self.dialog.configure(bg=tm.get("bg_primary"))
+
+        # 标题
+        title_frame = tk.Frame(self.dialog, padx=10, pady=10, bg=tm.get("bg_primary"))
+        title_frame.pack(fill=tk.X)
+
+        tk.Label(
+            title_frame,
+            text=f"拓展套装: {self.suit_name}",
+            font=("Microsoft YaHei", 12, "bold"),
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_primary"),
+        ).pack(anchor=tk.W)
+
+        # 当前套装信息
+        info_frame = tk.LabelFrame(
+            self.dialog,
+            text="当前套装信息",
+            padx=10,
+            pady=10,
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_primary"),
+        )
+        info_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        # 显示各部位代码
+        items = self.original_suit.get("items", {})
+        info_text = ""
+        for part in ["cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin", "weapon"]:
+            if part in items:
+                code = items[part]
+                part_name = CN_PART_NAMES.get(part, part)
+                info_text += f"{part_name}: {code}  "
+
+        tk.Label(
+            info_frame,
+            text=info_text if info_text else "无装备",
+            font=("Consolas", 10),
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_secondary"),
+            wraplength=550,
+        ).pack(anchor=tk.W)
+
+        # 输入区域
+        input_frame = tk.Frame(self.dialog, padx=10, pady=10, bg=tm.get("bg_primary"))
+        input_frame.pack(fill=tk.X)
+
+        tk.Label(
+            input_frame,
+            text="拓展数量:",
+            font=("Arial", 10),
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_primary"),
+        ).pack(side=tk.LEFT)
+
+        self.count_var = tk.StringVar(value="1")
+        self.count_entry = tk.Entry(
+            input_frame,
+            textvariable=self.count_var,
+            width=10,
+            font=("Arial", 10),
+            bg=tm.get("entry_bg"),
+            fg=tm.get("entry_fg"),
+            justify=tk.CENTER,
+        )
+        self.count_entry.pack(side=tk.LEFT, padx=5)
+
+        tk.Label(
+            input_frame,
+            text="套 (输入1-10之间的数字)",
+            font=("Arial", 9),
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_secondary"),
+        ).pack(side=tk.LEFT)
+
+        tk.Button(
+            input_frame,
+            text="预览",
+            command=self._preview_expansion,
+            bg=tm.get("accent_primary"),
+            fg="white",
+            width=10,
+        ).pack(side=tk.LEFT, padx=20)
+
+        # 预览区域
+        preview_frame = tk.LabelFrame(
+            self.dialog,
+            text="预览",
+            padx=10,
+            pady=10,
+            bg=tm.get("bg_primary"),
+            fg=tm.get("fg_primary"),
+        )
+        preview_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        # 使用滚动文本框显示预览
+        self.preview_text = tk.Text(
+            preview_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            bg=tm.get("entry_bg"),
+            fg=tm.get("entry_fg"),
+            height=10,
+        )
+        self.preview_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        scrollbar = ttk.Scrollbar(preview_frame, orient=tk.VERTICAL, command=self.preview_text.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        self.preview_text.config(yscrollcommand=scrollbar.set)
+
+        # 按钮区域
+        btn_frame = tk.Frame(self.dialog, padx=10, pady=15, bg=tm.get("bg_primary"))
+        btn_frame.pack(fill=tk.X)
+
+        tk.Button(
+            btn_frame,
+            text="取消",
+            command=self.dialog.destroy,
+            width=12,
+            bg=tm.get("bg_tertiary"),
+            fg=tm.get("fg_primary"),
+        ).pack(side=tk.LEFT, padx=5)
+
+        tk.Button(
+            btn_frame,
+            text="确认生成",
+            command=self._do_expand,
+            width=12,
+            bg=tm.get("accent_secondary"),
+            fg="white",
+        ).pack(side=tk.RIGHT, padx=5)
+
+        # 绑定回车键
+        self.count_entry.bind("<Return>", lambda e: self._preview_expansion())
+
+        # 初始预览
+        self._preview_expansion()
+
+    def _extract_code_suffix(self, code: str) -> Tuple[str, int]:
+        """提取代码的基础部分和后缀数字"""
+        if not code or not code.isdigit():
+            return (code, 0)
+        
+        code_int = int(code)
+        
+        # 尝试提取最后1位作为suffix
+        if code_int >= 10:
+            base = code[:-1]
+            suffix = int(code[-1:])
+            if base and base.isdigit():
+                return (base, suffix)
+        
+        return (code, 0)
+
+    def _increment_code(self, code: str, increment: int) -> str:
+        """将代码增加指定的数值"""
+        if not code or not code.isdigit():
+            return code
+        
+        base, suffix = self._extract_code_suffix(code)
+        new_suffix = suffix + increment
+        
+        # 保持原有的数字位数
+        suffix_len = len(code) - len(base)
+        if suffix_len > 0:
+            return f"{base}{new_suffix:0{suffix_len}d}"
+        else:
+            return str(int(code) + increment)
+
+    def _preview_expansion(self):
+        """预览将要生成的套装"""
+        try:
+            count = int(self.count_var.get())
+            if count < 1 or count > 10:
+                self.preview_text.delete(1.0, tk.END)
+                self.preview_text.insert(tk.END, "请输入1-10之间的数字")
+                return
+        except ValueError:
+            self.preview_text.delete(1.0, tk.END)
+            self.preview_text.insert(tk.END, "请输入有效的数字")
+            return
+
+        self.preview_text.delete(1.0, tk.END)
+        
+        items = self.original_suit.get("items", {})
+        
+        # 生成预览文本
+        for i in range(count):
+            suffix_num = i + 1
+            
+            # 解析原套装名称，提取基础名称
+            original_name = self.suit_name
+            if "[款式" in original_name:
+                base_name = original_name.split("[款式")[0].rstrip()
+            else:
+                base_name = original_name
+            
+            new_name = f"{base_name}[款式{suffix_num}]"
+            
+            # 生成新的部位代码
+            new_items = {}
+            lines = [f"{new_name}"]
+            
+            for part in ["cap", "hair", "face", "neck", "coat", "pants", "belt", "shoes", "skin", "weapon"]:
+                if part in items:
+                    original_code = items[part]
+                    new_code = self._increment_code(original_code, i)
+                    part_name = CN_PART_NAMES.get(part, part)
+                    new_items[part] = new_code
+                    lines.append(f"  {part_name}: {original_code} -> {new_code}")
+            
+            self.preview_text.insert(tk.END, "\n".join(lines) + "\n\n")
+
+    def _do_expand(self):
+        """执行拓展操作"""
+        try:
+            count = int(self.count_var.get())
+            if count < 1 or count > 10:
+                messagebox.showerror("错误", "请输入1-10之间的数字", parent=self.dialog)
+                return
+        except ValueError:
+            messagebox.showerror("错误", "请输入有效的数字", parent=self.dialog)
+            return
+
+        # 确认对话框
+        if not messagebox.askyesno(
+            "确认生成",
+            f"确定要生成 {count} 个拓展套装吗？\n\n原套装: {self.suit_name}",
+            icon="question",
+            parent=self.dialog,
+        ):
+            return
+
+        items = self.original_suit.get("items", {})
+        success_count = 0
+        
+        # 解析原套装名称，提取基础名称
+        original_name = self.suit_name
+        if "[款式" in original_name:
+            base_name = original_name.split("[款式")[0].rstrip()
+        else:
+            base_name = original_name
+
+        for i in range(count):
+            suffix_num = i + 1
+            new_name = f"{base_name}[款式{suffix_num}]"
+            
+            # 检查是否已存在同名套装
+            existing = self._get_suit_data(self.job_key, new_name)
+            if existing:
+                # 跳过已存在的
+                continue
+
+            # 生成新的部位代码
+            new_items = {}
+            for part, original_code in items.items():
+                new_code = self._increment_code(original_code, i)
+                new_items[part] = new_code
+
+            # 创建新套装
+            new_suit = {
+                "name": new_name,
+                "items": new_items,
+            }
+
+            # 保存到配置
+            if self._save_suit(self.job_key, new_suit):
+                success_count += 1
+
+        # 刷新列表
+        self.app._load_suit_list()
+        
+        if success_count > 0:
+            self.app.status_label.config(text=f"已生成 {success_count} 个拓展套装")
+            messagebox.showinfo(
+                "成功",
+                f"成功生成 {success_count} 个拓展套装",
+                parent=self.dialog,
+            )
+            self.dialog.destroy()
+        else:
+            messagebox.showwarning(
+                "提示",
+                "没有生成新的套装（可能已存在同名套装）",
+                parent=self.dialog,
+            )
+
+    def _save_suit(self, job_key: str, suit: Dict) -> bool:
+        """保存套装到配置"""
+        config = self.app.suit_loader._load_or_convert_config(job_key)
+        if not config:
+            return False
+
+        try:
+            if "suits" not in config:
+                config["suits"] = []
+
+            # 检查是否已存在
+            for existing in config["suits"]:
+                if existing.get("name") == suit["name"]:
+                    return False  # 已存在
+
+            config["suits"].append(suit)
+            
+            if self.app.suit_loader._save_config(job_key, config):
+                # 更新内存缓存
+                self.app.suit_loader.suits.setdefault(job_key, []).append(suit)
+                print(f"[INFO] 已保存套装: {suit['name']}")
+                return True
+            return False
+        except Exception as e:
+            print(f"[ERROR] 保存套装失败: {e}")
+            return False
 
 
 def main():

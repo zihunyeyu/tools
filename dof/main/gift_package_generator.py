@@ -17,12 +17,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import AVATAR_TABLE_BASE_PATH, AVATAR_TABLE_FILES, BASE_DIR
+from modules.common_utils import setup_logging
 
 # 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -41,18 +39,8 @@ SUIT_COLUMN_INDEX = {
     'skin': 9,   # 第10列
 }
 
-# 部位映射：装扮表部位 -> TSV equipment type
-PART_TO_EQUIP_TYPE = {
-    'cap': 'hat',
-    'hair': 'hair',
-    'face': 'face',
-    'neck': 'breast',
-    'coat': 'coat',
-    'pants': 'pants',
-    'belt': 'waist',
-    'shoes': 'shoes',
-    'skin': 'skin',
-}
+# 导入统一映射
+from modules.mappings import PART_TO_EQUIP_TYPE
 
 # 职业映射：job code -> TSV 文件路径
 JOB_TO_TSV_PATH = {

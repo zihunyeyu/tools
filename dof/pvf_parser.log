@@ -4603,3 +4603,16 @@
   失败: 5
   成功率: 99.96%
   耗时: 1.45s
+2026-03-14 10:18:27,683 - modules.avatar_extractor - INFO - 解析 equipment.lst: equipment/equipment.lst
+2026-03-14 10:18:27,974 - modules.avatar_extractor - INFO - lst 总行数: 103943
+2026-03-14 10:18:28,150 - modules.avatar_extractor - INFO - 解析完成: 有效 avatar 记录 72023 条
+2026-03-14 10:18:28,157 - modules.avatar_extractor - INFO - 开始批量提取 72023 个 avatar 文件（4802 批次）
+2026-03-14 10:18:36,375 - modules.avatar_extractor - INFO - 批量提取完成: 成功 71897 个文件
+2026-03-14 10:18:36,439 - modules.avatar_extractor - INFO - TSV 文件已保存: c:\Users\10704\PycharmProjects\tools\dof\output\complete_equipment_tags.tsv (72023 条记录)
+2026-03-14 10:18:36,440 - modules.avatar_extractor - INFO - 
+提取流程完成:
+  总文件数: 72023
+  成功解析: 71897
+  失败: 0
+  成功率: 99.83%
+  耗时: 8.76s
